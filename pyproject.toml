@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "isca"
+version = "0.0.1"
+description = "The core ISCA library"
+readme = {file="README.md", content-type = "text/markdown"}
+authors = [
+   {name="Sébastien Le Maguer", email="sebastien.lemaguer@helsinki.fi"}
+]
+license = ""
+keywords = []
+requires-python = ">=3.11"
+classifiers = [
+]
+dependencies = [
+]
+[project.optional-dependencies]
+dev = [
+  "pre-commit",
+  "black",
+  "basedpyright"
+]
+[project.urls]
+Homepage = "https://github.com/ISCACoordinator/isca"
+Issues = "https://github.com/ISCACoordinator/isca/issues"
+git = "https://github.com/ISCACoordinator/isca.git"
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.flake8]
+max-line-length = 120  # Adjusted to 120 characters
+extend-ignore = "E203, W503"  # Adjust as per your preferences
+
+[tool.mypy]
+python_version = 3.11
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_calls = true
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.basedpyright]
+typeCheckingMode = "standard"
+
+[tool.pre_commit]
+version = "2.15.0"
+hooks = ["black", "isort", "flake8"]
