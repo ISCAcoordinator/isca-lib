@@ -1,5 +1,6 @@
 from .person import Person
-from .conference import Paper, Conference
+from .event import Conference
+from .paper import Paper
 
 class ISCADataBase:
     def __init__(self):
