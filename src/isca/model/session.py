@@ -4,6 +4,20 @@ from .person import Person
 from .paper import Paper
 
 
+class Room:
+    def __init__(self, name: str, type: str, capacity: int|tuple[int]|list[int]|None):
+        self.name: str = name
+        self.type: str = type
+        self.capacity: int|tuple[int]|list[int]|None = capacity
+
+
+    def __str__(self) -> str:
+        str = f"{self.name}"
+        if self.capacity is not None:
+            str += f" (capacity={self.capacity})"
+
+        return str + f" [{self.type}]"
+
 class Session:
     def __init__(
         self,
@@ -11,9 +25,13 @@ class Session:
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
+        room: Room | None = None
     ):
         self.id = id
         self.name = name
+        self.room = room
+
+        # For now, start/end can't be modified to avoid side effects!
         self._start = start
         self._end = end
 
@@ -32,10 +50,11 @@ class PresentationSession(Session):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
+        room: Room | None = None,
         papers: list[Paper] = [],
         chairs: list[Person] = [],
     ):
-        super().__init__(id, name, start, end)
+        super().__init__(id, name, start, end, room)
         self._papers = papers
         self._chairs = chairs
 
@@ -68,38 +87,40 @@ class PresentationSession(Session):
         return self._papers
 
 
-class OralSession(Session):
+class OralSession(PresentationSession):
     def __init__(
         self,
         id: str,
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
+        room: Room | None = None,
         papers: list[Paper] = [],
         chairs: list[Person] = [],
         presentation_duration: int = 20,
     ):
-        super().__init__(id, name, start, end, papers, chairs)
+        super().__init__(id, name, start, end, room, papers, chairs)
         self._presentation_duration = presentation_duration
 
     def add_paper(self, paper: Paper):
-        expected_duration = self._presentation_duration * (len(papers) + 1)
-        total_duration = (end - start).seconds / 60
+        expected_duration = self._presentation_duration * (len(self.papers) + 1)
+        total_duration = (self.end - self.start).seconds / 60
 
         if expected_duration > total_duration:
             raise Exception(
                 f"When adding the paper, the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes."
             )
+        super().add_paper(paper)
 
-
-class PosterSession(Session):
+class PosterSession(PresentationSession):
     def __init__(
         self,
         id: str,
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
+        room: Room | None = None,
         papers: list[Paper] = [],
         chairs: list[Person] = [],
     ):
-        super().__init__(id, name, start, end, papers, chairs)
+        super().__init__(id, name, start, end, room, papers, chairs)
