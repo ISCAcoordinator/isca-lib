@@ -1,3 +1,4 @@
+from datetime import datetime
 import traceback
 import logging
 import re
@@ -8,12 +9,18 @@ import pandas as pd
 
 from ..model.person import Person
 from ..model.paper import Paper
+from ..model.session import Session, OralSession, PosterSession, Room
 
 from .utils.pdf import WordException, load_pdf_information
 
 CMT_AUTHOR_SEP = "; "
 CMT_FIRST_LAST_STEP = ", "
 CMT_CORRESPONDING_MARKER = "*"
+
+CMT_SESSION_TIMESLOTS_SHEET_NAME = "Timeslots"
+CMT_SESSION_SESSIONS_SHEET_NAME = "Sessions"
+CMT_SESSION_ROOMS_SHEET_NAME = "Rooms"
+CMT_SESSION_PAPER_SEPARATOR =","
 
 
 class CMTSerialiser:
@@ -65,9 +72,9 @@ class CMTSerialiser:
 
     def load_submissions(
         self, submission_summary_file: pathlib.Path, paper_root_dir: pathlib.Path | None = None
-    ) -> tuple[set[Paper], set[Person]]:
-        author_set = set()
-        paper_set = set()
+    ) -> tuple[dict[str, Paper], dict[str, Person]]:
+        dict_authors = dict()
+        dict_papers = dict()
 
         wb = load_workbook(filename=submission_summary_file)
         for worksheet in wb.sheetnames:
@@ -113,10 +120,72 @@ class CMTSerialiser:
                 else:
                     cur_paper = self._extract_df_information(paper_info)
 
-                paper_set.add(cur_paper)
-                author_set.update(cur_paper.authors)
+                dict_papers[cur_paper.id] = cur_paper
+                for cur_author in cur_paper.authors:
+                    dict_authors[cur_author.id] = cur_author
 
             self._logger.info(
                 f"[{worksheet}] total number of submissions {total_papers}: failed_papers={failed_papers} ({failed_papers/total_papers*100:.2f}%), word_papers={word_papers} ({word_papers/total_papers*100:.2f})%"
             )
-        return paper_set, author_set
+        return dict_papers, dict_authors
+
+    def load_sessions(self, session_summary_file: pathlib.Path, dict_papers: dict[str, Paper]={}) -> list[Session]:
+
+        # Load rooms
+        dict_room = dict()
+        df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_ROOMS_SHEET_NAME)
+        for _, room_info in df.iterrows():
+            capacity = str(room_info["Capacity"]).strip()
+            if (capacity == "") or (capacity == "nan"):
+                capacity = None
+            elif "-" in capacity:
+                capacity = [int(c.strip()) for c in capacity.split("-")]
+            else:
+                capacity = int(capacity)
+
+            room = Room(str(room_info["Room name"]), str(room_info["Room type"]), capacity)
+            dict_room[room.name] = room
+
+        # Now load timeslots
+        dict_timeslots = dict()
+        df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_TIMESLOTS_SHEET_NAME)
+        for _, timeslot_info in df.iterrows():
+            start_time = "03/08/2025 08:00"  # TODO: timeslot_info['Start']
+            start_time = datetime.strptime(start_time, '%d/%m/%Y %H:%M')
+            end_time = "03/08/2025 18:00"  # TODO: timeslot_info['End']
+            end_time = datetime.strptime(end_time, '%d/%m/%Y %H:%M')
+            dict_timeslots[timeslot_info["Timeslot name"]] = [start_time, end_time]
+
+        # And finally deal with sessions
+        list_sessions = []
+        df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_SESSIONS_SHEET_NAME)
+        for _, session_info in df.iterrows():
+            session_id = str(session_info["Session name"])
+            session_name = str(session_info["Session title"])
+            session_type = str(session_info["Session type"])
+
+            # TODO: Get time from the time slots, now this is just a place holder
+            cur_time_slot = dict_timeslots[list(dict_timeslots.keys())[0]]
+
+            # TODO: Get a room from the rooms, no this is just a place holder
+            cur_room = dict_room[list(dict_room.keys())[0]]
+
+            # Create the sessions
+            if session_type.lower() == "oral":
+                cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            elif session_type.lower() == "poster":
+                cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            else:
+                self._logger.error(f"This session type \"{session_type}\" is not yet supported (ignored)")
+                continue
+
+
+            # Now deal add the papers
+            session_paper_ids = [str(id).strip() for id in str(session_info["Papers"]).split(CMT_SESSION_PAPER_SEPARATOR)]
+            for paper_id in session_paper_ids:
+                if paper_id not in dict_papers:
+                    self._logger.error(f"{paper_id} is not an available papers, so ignored")
+                    continue
+                cur_session.add_paper(dict_papers[paper_id])
+            list_sessions.append(cur_session)
+        return list_sessions
