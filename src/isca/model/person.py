@@ -287,3 +287,7 @@ class Person:
 
     def _generate_id(self):
         return f"{self.firstname} {self.lastname} ({self.email})"
+
+    @property
+    def id(self):
+        return self._id
