@@ -1,6 +1,15 @@
+import traceback
+import logging
+import re
+import pathlib
+
+from openpyxl import load_workbook
 import pandas as pd
 
-from ..model import Paper, Person
+from ..model.person import Person
+from ..model.paper import Paper
+
+from .utils.pdf import WordException, load_pdf_information
 
 CMT_AUTHOR_SEP = "; "
 CMT_FIRST_LAST_STEP = ", "
@@ -8,31 +17,106 @@ CMT_CORRESPONDING_MARKER = "*"
 
 
 class CMTSerialiser:
-    def load_submissions(self, file_handler) -> tuple[set[Paper], set[Person]]:
-        df = pd.read_csv(file_handler, sep="\t")
-        author_set = set()
-        paper_set = set()
 
-        for _, paper_info in df.iterrows():
-            author_names = str(paper_info["Author Names"]).split(CMT_AUTHOR_SEP)
-            author_emails = str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)
+    def __init__(self, with_camera_ready: bool = False):
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self.with_camera_ready = with_camera_ready
+        if not with_camera_ready:
+            self._logger.warning(
+                "Metadata extracted from the CMT spreadsheet, likely to be highly inconsistent!",
+            )
 
-            assert len(author_emails) == len(
-                author_names
-            ), f"The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
+    def _extract_df_information(self, paper_info: pd.Series) -> Paper:
+        author_names = str(paper_info["Author Names"]).split(CMT_AUTHOR_SEP)
+        author_emails = str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)
 
-            paper_authors = list()
+        # assert len(author_emails) == len(
+        #     author_names
+        # ), f"The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
 
-            for i_author, cur_author in enumerate(author_names):
-                last_name, first_name = cur_author.split(CMT_FIRST_LAST_STEP)
-                first_name = first_name.replace(CMT_CORRESPONDING_MARKER, "")
+        paper_authors = list()
+        for i_author, cur_author in enumerate(author_names):
+            cur_author = cur_author.replace("CMT_CORRESPONDING_MARKER", "")
+
+            # FIXME: check with martin how did he extract the first and last name
+            cur_author = re.sub(" (.*)", "", cur_author)
+            author_elts = cur_author.split(" ")
+            last_name = author_elts[-1]
+            first_name = " ".join(author_elts[:-1])
+            # last_name, first_name = cur_author.split(CMT_FIRST_LAST_STEP)
+
+            # FIXME: back to normal
+            first_name = first_name.replace(CMT_CORRESPONDING_MARKER, "")
+            if i_author < len(author_emails):
                 email = author_emails[i_author].replace(CMT_CORRESPONDING_MARKER, "")
+            else:
+                email = f'{".".join(author_elts)}@none.org'
 
                 cur_person = Person(first_name, last_name, email)
                 paper_authors.append(cur_person)
-                author_set.add(cur_person)
 
-            cur_paper = Paper(str(paper_info["Paper Title"]), paper_authors, str(paper_info["Abstract"]))
-            paper_set.add(cur_paper)
+        return Paper(
+            str(paper_info["Paper Title"]),
+            paper_authors,
+            abstract=str(paper_info["Abstract"]),
+            id=str(paper_info["Paper ID"]),
+        )
+        pass
 
+    def load_submissions(
+        self, submission_summary_file: pathlib.Path, paper_root_dir: pathlib.Path | None = None
+    ) -> tuple[set[Paper], set[Person]]:
+        author_set = set()
+        paper_set = set()
+
+        wb = load_workbook(filename=submission_summary_file)
+        for worksheet in wb.sheetnames:
+            df = pd.read_excel(submission_summary_file, engine="openpyxl", skiprows=2, sheet_name=worksheet)
+            total_papers = df.shape[0]
+            failed_papers = 0
+            word_papers = 0
+            for _, paper_info in df.iterrows():
+                if self.with_camera_ready:
+                    try:
+                        if paper_root_dir is not None:
+                            paper_id = str(paper_info["Paper ID"])
+                            pdf_lists = list((paper_root_dir / paper_id).glob("**/*.pdf"))
+
+                            if len(pdf_lists) > 0:
+                                cur_paper = load_pdf_information(
+                                    str(paper_info["Paper ID"]), pdf_lists[0], str(paper_info["Abstract"])
+                                )
+                            else:
+                                cur_paper = self._extract_df_information(paper_info)
+                        else:
+                            cur_paper = self._extract_df_information(paper_info)
+                    except WordException:
+                        cur_paper = self._extract_df_information(paper_info)
+                        self._logger.warning(
+                            f"[{paper_info['Paper ID']}] Can't extract the information from a PDF generated by word",
+                            extra={
+                                "paper_id": paper_info["Paper ID"],
+                            },
+                        )
+                        word_papers += 1
+                    except Exception as ex:
+                        self._logger.error(
+                            f"[{paper_info['Paper ID']}] Extraction of the metadata from the PDF failed",
+                            extra={
+                                "paper_id": paper_info["Paper ID"],
+                                "exception": ex,
+                                "traceback": traceback.format_exc(),
+                            },
+                        )
+                        cur_paper = self._extract_df_information(paper_info)
+                        failed_papers += 1
+                else:
+                    cur_paper = self._extract_df_information(paper_info)
+
+                paper_set.add(cur_paper)
+                author_set.update(cur_paper.authors)
+
+            self._logger.info(
+                f"[{worksheet}] total number of submissions {total_papers}: failed_papers={failed_papers} ({failed_papers/total_papers*100:.2f}%), word_papers={word_papers} ({word_papers/total_papers*100:.2f})%"
+            )
         return paper_set, author_set
