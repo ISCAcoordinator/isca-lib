@@ -23,51 +23,18 @@ class Session:
         self,
         id: str,
         name: str,
-        start: datetime.datetime,
-        end: datetime.datetime,
-        room: Room | None = None
+        papers: list[Paper] | None = None,
     ):
         self.id = id
         self.name = name
-        self.room = room
-
-        # For now, start/end can't be modified to avoid side effects!
-        self._start = start
-        self._end = end
+        self._papers = papers if papers is not None else []
 
     @property
-    def start(self) -> datetime.datetime:
-        return self._start
-
-    @property
-    def end(self) -> datetime.datetime:
-        return self._end
-
-class PresentationSession(Session):
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        start: datetime.datetime,
-        end: datetime.datetime,
-        room: Room | None = None,
-        papers: list[Paper] = [],
-        chairs: list[Person] = [],
-    ):
-        super().__init__(id, name, start, end, room)
-        self._papers = papers
-        self._chairs = chairs
+    def papers(self) -> list[Paper]:
+        return self._papers.copy()
 
     def add_paper(self, paper: Paper):
         self._papers.append(paper)
-
-    def get_paper(self, idx: int) -> Paper:
-        if idx >= len(self._papers):
-            raise IndexError(
-                f'There are {len(self._papers)} in the session, you are asking for the paper at index "{idx}"'
-            )
-
-        return self._papers[idx]
 
     def is_in_session(self, paper: Paper) -> bool:
         return paper in self._papers
@@ -82,9 +49,32 @@ class PresentationSession(Session):
             raise ValueError(f'"{paper_out.id}" is not part of the session, so it can\'t be replaced')
         self._papers[idx] = paper_in
 
+class PresentationSession(Session):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        room: Room | None = None,
+        papers: list[Paper] | None = None,
+        chairs: list[Person] | None = None,
+    ):
+        super().__init__(id, name, papers)
+        self._chairs = chairs if chairs is not None else []
+        self.room = room
+
+        # For now, start/end can't be modified to avoid side effects!
+        self._start = start
+        self._end = end
+
     @property
-    def papers(self) -> list[Paper]:
-        return self._papers
+    def start(self) -> datetime.datetime:
+        return self._start
+
+    @property
+    def end(self) -> datetime.datetime:
+        return self._end
 
 
 class OralSession(PresentationSession):
@@ -95,8 +85,8 @@ class OralSession(PresentationSession):
         start: datetime.datetime,
         end: datetime.datetime,
         room: Room | None = None,
-        papers: list[Paper] = [],
-        chairs: list[Person] = [],
+        papers: list[Paper] | None = None,
+        chairs: list[Person] | None = None,
         presentation_duration: int = 20,
     ):
         super().__init__(id, name, start, end, room, papers, chairs)
@@ -108,7 +98,7 @@ class OralSession(PresentationSession):
 
         if expected_duration > total_duration:
             raise Exception(
-                f"When adding the paper, the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes."
+                f"When adding the paper to session \"{self.id}\", the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes."
             )
         super().add_paper(paper)
 
@@ -120,7 +110,7 @@ class PosterSession(PresentationSession):
         start: datetime.datetime,
         end: datetime.datetime,
         room: Room | None = None,
-        papers: list[Paper] = [],
-        chairs: list[Person] = [],
+        papers: list[Paper] | None = None,
+        chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, start, end, room, papers, chairs)

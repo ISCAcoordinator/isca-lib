@@ -2,6 +2,7 @@ import pathlib
 
 from .person import Affiliation, Person
 
+
 class Paper:
     """A paper part of the ISCA process
 
@@ -33,10 +34,10 @@ class Paper:
         authors: list[Person],
         abstract: str | None = None,
         pdf_file: pathlib.Path | str | None = None,
-        presenters: list[Person] = [],
-        reviewers: list[Person] = [],
-        alternative_affiliations: dict[Person, Affiliation] = dict(),
-        id: str | None = None
+        presenters: list[Person] | None = None,
+        reviewers: list[Person] | None = None,
+        alternative_affiliations: dict[Person, Affiliation] | None = None,
+        id: str | None = None,
     ):
         """Initialisation method
 
@@ -63,9 +64,11 @@ class Paper:
         self.pdf_file: pathlib.Path | None = (
             pathlib.Path(pdf_file) if (pdf_file is not None) and isinstance(pdf_file, str) else pdf_file
         )
-        self.presenters: list[Person] = presenters
-        self.reviewers: list[Person] = reviewers
-        self.alternative_affiliations: dict[Person, Affiliation] = alternative_affiliations
+        self.presenters: list[Person] = presenters if presenters is not None else []
+        self.reviewers: list[Person] = reviewers if reviewers is not None else []
+        self.alternative_affiliations: dict[Person, Affiliation] = (
+            alternative_affiliations if alternative_affiliations is not None else dict()
+        )
 
         self._id: str | None = id
 

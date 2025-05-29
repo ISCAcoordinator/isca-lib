@@ -4,11 +4,12 @@ from .paper import Paper
 from .person import Person
 from .session import Session, PresentationSession
 
+
 class Event:
     def __init__(self, id: str, name: str, start_date: datetime.date, end_date: datetime.date, serie: str | None):
         self._id: str = id
         self._name: str = name
-        self._serie: str = serie
+        self._serie: str | None = serie
         self.start_date: datetime.date = start_date
         self.end_date: datetime.date = end_date
 
@@ -51,10 +52,10 @@ class Conference(Event):
                 self.add_paper(paper, force_replace=False)
 
         self._sessions.append(session)
-        self._sessions = sorted(self._sessions, key=lambda x: x.start) # Sort sessions by starting time
+        self._sessions = sorted(self._sessions, key=lambda x: x.start)  # Sort sessions by starting time
 
     def remove_session(self, session: Session):
-        if (session.id not in self._sessions):
+        if session.id not in self._sessions:
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
         if isinstance(session, PresentationSession):
@@ -62,7 +63,6 @@ class Conference(Event):
                 self.add_paper(paper, force_replace=False)
 
         self._sessions.remove(session)
-
 
     @property
     def papers(self) -> dict[str, Paper]:
