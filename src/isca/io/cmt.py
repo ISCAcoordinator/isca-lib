@@ -20,14 +20,14 @@ CMT_CORRESPONDING_MARKER = "*"
 CMT_SESSION_TIMESLOTS_SHEET_NAME = "Timeslots"
 CMT_SESSION_SESSIONS_SHEET_NAME = "Sessions"
 CMT_SESSION_ROOMS_SHEET_NAME = "Rooms"
-CMT_SESSION_PAPER_SEPARATOR =","
+CMT_SESSION_PAPER_SEPARATOR = ","
 
 
 class CMTSerialiser:
-
-    def __init__(self, with_camera_ready: bool = False):
+    def __init__(self, with_camera_ready: bool = False, session_unplanned: bool = False):
         self._logger = logging.getLogger(self.__class__.__name__)
         self.with_camera_ready = with_camera_ready
+        self.session_unplanned = session_unplanned
         if not with_camera_ready:
             self._logger.warning(
                 "Metadata extracted from the CMT spreadsheet, likely to be highly inconsistent!",
@@ -129,7 +129,7 @@ class CMTSerialiser:
             )
         return dict_papers, dict_authors
 
-    def load_sessions(self, session_summary_file: pathlib.Path, dict_papers: dict[str, Paper]={}) -> list[Session]:
+    def load_sessions(self, session_summary_file: pathlib.Path, dict_papers: dict[str, Paper] = {}) -> list[Session]:
 
         # Load rooms
         dict_room = dict()
@@ -149,11 +149,12 @@ class CMTSerialiser:
         # Now load timeslots
         dict_timeslots = dict()
         df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_TIMESLOTS_SHEET_NAME)
+        df["Date"] = df["Date"].astype(str)
         for _, timeslot_info in df.iterrows():
-            start_time = "03/08/2025 08:00"  # TODO: timeslot_info['Start']
-            start_time = datetime.strptime(start_time, '%d/%m/%Y %H:%M')
-            end_time = "03/08/2025 18:00"  # TODO: timeslot_info['End']
-            end_time = datetime.strptime(end_time, '%d/%m/%Y %H:%M')
+            start_time = f"{timeslot_info['Date']} {timeslot_info['Start']}"
+            start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+            end_time = f"{timeslot_info['Date']} {timeslot_info['End']}"
+            end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
             dict_timeslots[timeslot_info["Timeslot name"]] = [start_time, end_time]
 
         # And finally deal with sessions
@@ -162,26 +163,30 @@ class CMTSerialiser:
         for _, session_info in df.iterrows():
             session_id = str(session_info["Session name"])
             session_name = str(session_info["Session title"])
-            session_type = str(session_info["Session type"])
-
-            # TODO: Get time from the time slots, now this is just a place holder
-            cur_time_slot = dict_timeslots[list(dict_timeslots.keys())[0]]
-
-            # TODO: Get a room from the rooms, no this is just a place holder
-            cur_room = dict_room[list(dict_room.keys())[0]]
 
             # Create the sessions
-            if session_type.lower() == "oral":
-                cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
-            elif session_type.lower() == "poster":
-                cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            if self.session_unplanned:
+                cur_session = Session(session_id, session_name)
             else:
-                self._logger.error(f"This session type \"{session_type}\" is not yet supported (ignored)")
-                continue
+                # TODO: Get time from the time slots, now this is just a place holder
+                cur_time_slot = dict_timeslots[list(dict_timeslots.keys())[0]]
 
+                # TODO: Get a room from the rooms, no this is just a place holder
+                cur_room = dict_room[list(dict_room.keys())[0]]
+
+                session_type = str(session_info["Session type"])
+                if session_type.lower() == "oral":
+                    cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                elif session_type.lower() == "poster":
+                    cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                else:
+                    self._logger.error(f'This session type "{session_type}" is not yet supported (ignored)')
+                    continue
 
             # Now deal add the papers
-            session_paper_ids = [str(id).strip() for id in str(session_info["Papers"]).split(CMT_SESSION_PAPER_SEPARATOR)]
+            session_paper_ids = [
+                str(id).strip() for id in str(session_info["Papers"]).split(CMT_SESSION_PAPER_SEPARATOR)
+            ]
             for paper_id in session_paper_ids:
                 if paper_id not in dict_papers:
                     self._logger.error(f"{paper_id} is not an available papers, so ignored")
