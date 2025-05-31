@@ -58,10 +58,10 @@ class CMTSerialiser:
 
         paper_authors = list()
         for i_author, cur_author in enumerate(author_names):
-            cur_author = cur_author.replace("CMT_CORRESPONDING_MARKER", "")
+            cur_author = cur_author.replace(CMT_CORRESPONDING_MARKER, "").strip()
 
             # FIXME: check with martin how did he extract the first and last name
-            cur_author = re.sub(" (.*)", "", cur_author)
+            cur_author = re.sub(" \(.*\)", "", cur_author)
             author_elts = cur_author.split(" ")
             last_name = author_elts[-1]
             first_name = " ".join(author_elts[:-1])
@@ -74,8 +74,8 @@ class CMTSerialiser:
             else:
                 email = f'{".".join(author_elts)}@none.org'
 
-                cur_person = Person(first_name, last_name, email)
-                paper_authors.append(cur_person)
+            cur_person = Person(first_name, last_name, email)
+            paper_authors.append(cur_person)
 
         return Paper(
             str(paper_info["Paper Title"]),
@@ -96,6 +96,7 @@ class CMTSerialiser:
             total_papers = df.shape[0]
             failed_papers = 0
             word_papers = 0
+            no_pdf = 0
             for _, paper_info in df.iterrows():
                 if self.with_camera_ready:
                     try:
@@ -109,6 +110,12 @@ class CMTSerialiser:
                                 )
                             else:
                                 cur_paper = self._extract_df_information(paper_info)
+                                self._logger.warning(
+                                    f"[{paper_info['Paper ID']}] No PDF attached",
+                                    extra={"paper_id": paper_info["Paper ID"]},
+                                )
+                                no_pdf += 1
+
                         else:
                             cur_paper = self._extract_df_information(paper_info)
                     except WordException:
@@ -139,7 +146,10 @@ class CMTSerialiser:
                     dict_authors[cur_author.id] = cur_author
 
             self._logger.info(
-                f"[{worksheet}] total number of submissions {total_papers}: failed_papers={failed_papers} ({failed_papers/total_papers*100:.2f}%), word_papers={word_papers} ({word_papers/total_papers*100:.2f})%"
+                f"[{worksheet}] total number of submissions {total_papers}: "
+                + f"failed_papers={failed_papers} ({failed_papers/total_papers*100:.2f}%), "
+                + f"word_papers={word_papers} ({word_papers/total_papers*100:.2f}%), "
+                + f"nopdf ={no_pdf} ({no_pdf/total_papers*100:.2f}%)"
             )
         return dict_papers, dict_authors
 
@@ -238,7 +248,9 @@ class CMTSerialiser:
                     elts = chair.strip().split(" ")
                     first_name = " ".join(elts[:-1])
                     last_name = elts[-1]
-                    chairs.append(Person(first_name, last_name, "noemail@nodomain.org")) # FIXME: for now the email is slightly forced
+                    chairs.append(
+                        Person(first_name, last_name, "noemail@nodomain.org")
+                    )  # FIXME: for now the email is slightly forced
 
         conf = Conference(
             conf_info["id"],
