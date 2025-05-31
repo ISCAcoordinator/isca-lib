@@ -8,8 +8,8 @@ from .session import Session, PresentationSession
 class Event:
     def __init__(self, id: str, name: str, start_date: datetime.date, end_date: datetime.date, serie: str | None):
         self._id: str = id
-        self._name: str = name
-        self._serie: str | None = serie
+        self.name: str = name
+        self.serie: str | None = serie
         self.start_date: datetime.date = start_date
         self.end_date: datetime.date = end_date
 
@@ -73,3 +73,7 @@ class Conference(Event):
     @property
     def papers(self) -> dict[str, Paper]:
         return self._papers.copy()
+
+    @property
+    def sessions(self) -> list[Session]:
+        return self._sessions.copy()
