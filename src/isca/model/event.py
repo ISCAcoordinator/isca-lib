@@ -16,10 +16,16 @@ class Event:
 
 class Conference(Event):
     def __init__(
-        self, id: str, name: str, start_date: datetime.date, end_date: datetime.date, serie: str, chairs: list[Person]
+        self,
+        id: str,
+        name: str,
+        start_date: datetime.date,
+        end_date: datetime.date,
+        serie: str | None = None,
+        chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, start_date, end_date, serie)
-        self.chairs: list[Person] = chairs
+        self.chairs: list[Person] | None = chairs
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
 
@@ -52,7 +58,7 @@ class Conference(Event):
                 self.add_paper(paper, force_replace=False)
 
         self._sessions.append(session)
-        self._sessions = sorted(self._sessions, key=lambda x: x.start)  # Sort sessions by starting time
+        self._sessions = sorted(self._sessions, key=lambda x: x.sort_criterion())  # Sort sessions by starting time
 
     def remove_session(self, session: Session):
         if session.id not in self._sessions:

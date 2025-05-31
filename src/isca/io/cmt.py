@@ -1,18 +1,28 @@
+# Python
 from datetime import datetime
 import traceback
 import logging
 import re
 import pathlib
 
+# Data loading
+from ruamel.yaml import YAML
 from openpyxl import load_workbook
 import pandas as pd
 
+# Model helpers
 from ..model.person import Person
 from ..model.paper import Paper
 from ..model.session import Session, OralSession, PosterSession, Room
+from ..model.event import Conference
 
+# IO Utils
 from .utils.pdf import WordException, load_pdf_information
 
+
+###############################################################################
+# Constants
+###############################################################################
 CMT_AUTHOR_SEP = "; "
 CMT_FIRST_LAST_STEP = ", "
 CMT_CORRESPONDING_MARKER = "*"
@@ -22,7 +32,12 @@ CMT_SESSION_SESSIONS_SHEET_NAME = "Sessions"
 CMT_SESSION_ROOMS_SHEET_NAME = "Rooms"
 CMT_SESSION_PAPER_SEPARATOR = ","
 
+CMT_CHAIR_CONF_SEPARATOR = ","
 
+
+###############################################################################
+# Core of the module
+###############################################################################
 class CMTSerialiser:
     def __init__(self, with_camera_ready: bool = False, session_unplanned: bool = False):
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -68,7 +83,6 @@ class CMTSerialiser:
             abstract=str(paper_info["Abstract"]),
             id=str(paper_info["Paper ID"]),
         )
-        pass
 
     def load_submissions(
         self, submission_summary_file: pathlib.Path, paper_root_dir: pathlib.Path | None = None
@@ -169,10 +183,8 @@ class CMTSerialiser:
                 cur_session = Session(session_id, session_name)
             else:
                 # TODO: Get time from the time slots, now this is just a place holder
-                cur_time_slot = dict_timeslots[list(dict_timeslots.keys())[0]]
-
-                # TODO: Get a room from the rooms, no this is just a place holder
-                cur_room = dict_room[list(dict_room.keys())[0]]
+                cur_time_slot = dict_timeslots[session_info["Timeslot name"]]
+                cur_room = dict_room[session_info["Room name"]]
 
                 session_type = str(session_info["Session type"])
                 if session_type.lower() == "oral":
@@ -194,3 +206,53 @@ class CMTSerialiser:
                 cur_session.add_paper(dict_papers[paper_id])
             list_sessions.append(cur_session)
         return list_sessions
+
+    def load_conference(
+        self,
+        conference_info_file: pathlib.Path,
+        sessions: list[Session] | None = None,
+        papers: list[Paper] | None = None,
+    ) -> Conference:
+
+        if (sessions is not None) and (papers is not None):
+            raise Exception(
+                "Either the sessions OR the papers should be given. The papers will be loaded from the sessions. In case no sessions, the provide the papers."
+            )
+
+        conf_info = dict()
+        yaml = YAML(typ="rt", pure=True)
+        with open(conference_info_file) as f_in:
+            conf_info = yaml.load(f_in.read())
+
+        # # Convert the dates to datetime
+        # conf_info["startDate"] = datetime.strptime(conf_info["startDate"], "%Y-%m-%d")
+        # conf_info["endDate"] = datetime.strptime(conf_info["endDate"], "%Y-%m-%d")
+
+        chairs = None
+        if "chairs" in conf_info:
+            chairs = []
+            for chair in conf_info["chairs"].split(CMT_CHAIR_CONF_SEPARATOR):
+                if "{" in chair:
+                    raise NotImplementedError("Last name with spaces is not yet supported, but should be")
+                else:
+                    elts = chair.strip().split(" ")
+                    first_name = " ".join(elts[:-1])
+                    last_name = elts[-1]
+                    chairs.append(Person(first_name, last_name, "noemail@nodomain.org")) # FIXME: for now the email is slightly forced
+
+        conf = Conference(
+            conf_info["id"],
+            conf_info["name"],
+            conf_info["startDate"],
+            conf_info["endDate"],
+            conf_info["serie"] if "serie" in conf_info else None,
+            chairs,
+        )
+        if sessions is not None:
+            for session in sessions:
+                conf.add_session(session)
+        elif papers is not None:
+            for paper in papers:
+                conf.add_paper(paper)
+
+        return conf

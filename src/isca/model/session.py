@@ -49,6 +49,9 @@ class Session:
             raise ValueError(f'"{paper_out.id}" is not part of the session, so it can\'t be replaced')
         self._papers[idx] = paper_in
 
+    def sort_criterion(self) -> str:
+        return self.id
+
 class PresentationSession(Session):
     def __init__(
         self,
@@ -75,6 +78,9 @@ class PresentationSession(Session):
     @property
     def end(self) -> datetime.datetime:
         return self._end
+
+    def sort_criterion(self) -> str:
+        return "_".join([str(s) for s in (self.start, self._end, self.id, self.name)])
 
 
 class OralSession(PresentationSession):
