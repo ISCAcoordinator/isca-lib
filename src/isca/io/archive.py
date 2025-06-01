@@ -8,7 +8,7 @@ import json
 
 # Model helpers
 from ..model.person import Person, Role
-from ..model.paper import Paper
+from ..model.paper import Paper, PublishedPaper
 from ..model.session import Session, OralSession, PosterSession, Room
 from ..model.event import Conference
 
@@ -37,10 +37,20 @@ class ArchiveSerialiser:
                 email = f'{".".join(author)}@none.org' # FIXME: email issue here!
                 authors.append(Person(author[0], author[1], email, set([Role.AUTHOR])))
 
-            cur_paper = Paper(
+            cur_paper = PublishedPaper(
+                paper_id,
                 paper["title"],
                 authors,
-                paper["abstract"]
+                paper["abstract"],
+                None, # TODO: pdf is not yet supported
+                paper["original_id"] if "original_id" in paper else None,
+                paper["page_count"] if "page_count" in paper else None,
+                paper["order"] if "order" in paper else None,
+                paper["p1"] if "p1" in paper else None,
+                paper["pn"] if "pn" in paper else None,
+                paper["doi"] if "doi" in paper else None,
+                paper["author_area_id"] if "author_area_id" in paper else None,
+                paper["author_area_label"] if "author_area_label" in paper else None,
             )
             papers[paper_id] = cur_paper
 
@@ -123,6 +133,24 @@ class ArchiveSerialiser:
                     "title": paper.title,
                     "abstract": paper.abstract
                 }
+                if isinstance(paper, PublishedPaper):
+                    if paper.original_id is not None:
+                        cur_paper["original_id"] = paper.original_id
+                    if paper.page_count is not None:
+                        cur_paper["page_count"] = paper.page_count
+                    if paper.order is not None:
+                        cur_paper["order"] = paper.order
+                    if paper.start_page is not None:
+                        cur_paper["p1"] = paper.start_page
+                    if paper.end_page is not None:
+                        cur_paper["pn"] = paper.end_page
+                    if paper.doi is not None:
+                        cur_paper["doi"] = paper.doi
+                    if paper.author_area_id is not None:
+                        cur_paper["author_area_id"] = paper.author_area_id
+                    if paper.author_area_label is not None:
+                        cur_paper["author_area_label"] = paper.author_area_label
+
                 dict_out["papers"][paper.id] = cur_paper
             dict_out["sessions"].append(cur_session)
 

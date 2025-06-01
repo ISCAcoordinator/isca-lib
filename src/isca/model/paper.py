@@ -86,3 +86,31 @@ class Paper:
             paper += f"  - {author}\n"
 
         return paper
+
+class PublishedPaper(Paper):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        authors: list[Person],
+        abstract: str | None = None,
+        pdf_file: pathlib.Path | str | None = None,
+        original_id: str | None = None,
+        page_count: int | None = None,
+        order: int | None = None,
+        start_page: int | None = None,
+        end_page: int | None = None,
+        doi: str | None = None,
+        author_area_id: str | None = None,
+        author_area_label: str | None = None
+    ):
+        super().__init__(title, authors, abstract, pdf_file, None, None, dict(), id)
+
+        self.original_id:  str | None  = original_id
+        self.page_count:  int | None  = page_count
+        self.order:  int | None  = order
+        self.start_page:  int | None  = start_page
+        self.end_page:  int | None  = end_page
+        self.doi:  str | None  = doi
+        self.author_area_id:  str | None  = author_area_id
+        self.author_area_label:  str | None  = author_area_label
