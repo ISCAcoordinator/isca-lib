@@ -190,8 +190,8 @@ class CMTSerialiser:
                                     extra={
                                         "paper_id": paper_info["Paper ID"],
                                         "metadata_from_pdf": True,
-                                        "source": pdf_path
-                                    }
+                                        "source": pdf_path,
+                                    },
                                 )
                             else:
                                 cur_paper = self._extract_df_information(paper_info)
@@ -290,7 +290,10 @@ class CMTSerialiser:
                 elif session_type.lower() == "poster":
                     cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
                 else:
-                    self._logger.error(f'This session type "{session_type}" is not yet supported (ignored)')
+                    self._logger.error(
+                        f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
+                        extra={"session_id": session_id, "session_name": session_name},
+                    )
                     continue
 
             # Now deal add the papers
@@ -299,7 +302,10 @@ class CMTSerialiser:
             ]
             for paper_id in session_paper_ids:
                 if paper_id not in dict_papers:
-                    self._logger.error(f"{paper_id} is not an available papers, so ignored")
+                    self._logger.error(
+                        f"[{session_id}] {paper_id} is not an available papers, so ignored",
+                        extra={"session_id": session_id, "session_name": session_name},
+                    )
                     continue
                 cur_session.add_paper(dict_papers[paper_id])
             list_sessions.append(cur_session)
