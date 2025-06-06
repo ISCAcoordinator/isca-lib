@@ -147,7 +147,7 @@ class CMTSerialiser:
                 dict_users[cur_user.id] = cur_user
         return dict_users
 
-    def load_submissions(
+    def load_papers(
         self,
         submission_summary_file: pathlib.Path,
         paper_root_dir: pathlib.Path | None = None,
@@ -354,3 +354,32 @@ class CMTSerialiser:
                 conf.add_paper(paper)
 
         return conf
+
+    def dump_papers(self, papers: dict[str, Paper], output_file: pathlib.Path):
+        list_papers = []
+        for paper_id, cur_paper in papers.items():
+            author_emails = []
+            author_names = []
+            for author in cur_paper.authors:
+                author_emails.append(author.email)
+                author_str = f"{author.firstname} "
+                if author.middle_initial != "":
+                    author_str += f"{author.middle_initial} "
+                author_str += f"{author.lastname}"
+
+                # TODO: add affiliations
+
+                author_names.append(author_str)
+
+            paper_info = {
+                "Paper ID": paper_id,
+                "Paper Title": cur_paper.title,
+                "Paper Abstract": cur_paper.abstract,
+                "Author Emails": CMT_AUTHOR_SEP.join(author_emails),
+                "Author Names": CMT_AUTHOR_SEP.join(author_names)
+            }
+            list_papers.append(paper_info)
+        df = pd.DataFrame(list_papers)
+
+        with pd.ExcelWriter(output_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+            df.to_excel(writer, sheet_name="papers", index=False)
