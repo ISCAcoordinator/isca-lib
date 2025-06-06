@@ -17,7 +17,7 @@ from ..model.session import Session, OralSession, PosterSession, Room
 from ..model.event import Conference
 
 # IO Utils
-from .utils.pdf import WordException, load_pdf_information
+from .utils.pdf import load_pdf_information, WordException, PDFMetadataException
 
 
 ###############################################################################
@@ -170,7 +170,15 @@ class CMTSerialiser:
                             paper_id = str(paper_info["Paper ID"])
                             pdf_path = paper_root_dir / f"{paper_id}.pdf"
 
-                            if (not pdf_path.exists()) and (updated_paper_root_dir is not None):
+                            if (updated_paper_root_dir is not None) and (
+                                updated_paper_root_dir / f"{paper_id}.pdf"
+                            ).exists():
+                                self._logger.debug(
+                                    f"[{paper_info['Paper ID']}] using the updated PDF",
+                                    extra={
+                                        "paper_id": paper_info["Paper ID"],
+                                    },
+                                )
                                 pdf_path = updated_paper_root_dir / f"{paper_id}.pdf"
 
                             if pdf_path.exists():
@@ -196,9 +204,9 @@ class CMTSerialiser:
                             },
                         )
                         word_papers += 1
-                    except Exception as ex:
+                    except (PDFMetadataException, KeyError, IndexError) as ex:
                         self._logger.error(
-                            f"[{paper_info['Paper ID']}] Extraction of the metadata from the PDF failed",
+                            f"[{paper_info['Paper ID']}] Extraction of the metadata from the PDF failed, falling back on the excel spreadsheet",
                             extra={
                                 "paper_id": paper_info["Paper ID"],
                                 "exception": ex,
