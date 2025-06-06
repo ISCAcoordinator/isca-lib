@@ -185,6 +185,14 @@ class CMTSerialiser:
                                 cur_paper = load_pdf_information(
                                     str(paper_info["Paper ID"]), pdf_path, str(paper_info["Abstract"])
                                 )
+                                self._logger.debug(
+                                    f"[{paper_info['Paper ID']}] Metadata extracted from the PDF {pdf_path}",
+                                    extra={
+                                        "paper_id": paper_info["Paper ID"],
+                                        "metadata_from_pdf": True,
+                                        "source": pdf_path
+                                    }
+                                )
                             else:
                                 cur_paper = self._extract_df_information(paper_info)
                                 self._logger.warning(
