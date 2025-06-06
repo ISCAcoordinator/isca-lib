@@ -85,14 +85,17 @@ class CMTSerialiser:
         )
 
     def load_submissions(
-        self, submission_summary_file: pathlib.Path, paper_root_dir: pathlib.Path | None = None
+        self,
+        submission_summary_file: pathlib.Path,
+        paper_root_dir: pathlib.Path | None = None,
+        updated_paper_root_dir: pathlib.Path | None = None,
     ) -> tuple[dict[str, Paper], dict[str, Person]]:
         dict_authors = dict()
         dict_papers = dict()
 
         wb = load_workbook(filename=submission_summary_file)
         for worksheet in wb.sheetnames:
-            df = pd.read_excel(submission_summary_file, engine="openpyxl", skiprows=2, sheet_name=worksheet)
+            df = pd.read_excel(submission_summary_file, engine="openpyxl", sheet_name=worksheet)
             total_papers = df.shape[0]
             failed_papers = 0
             word_papers = 0
@@ -102,11 +105,15 @@ class CMTSerialiser:
                     try:
                         if paper_root_dir is not None:
                             paper_id = str(paper_info["Paper ID"])
-                            pdf_lists = list((paper_root_dir / paper_id).glob("**/*.pdf"))
+                            pdf_path = paper_root_dir / f"{paper_id}.pdf"
 
-                            if len(pdf_lists) > 0:
+                            if (not pdf_path.exists()) and (updated_paper_root_dir is not None):
+                                pdf_path = updated_paper_root_dir / f"{paper_id}.pdf"
+
+
+                            if pdf_path.exists():
                                 cur_paper = load_pdf_information(
-                                    str(paper_info["Paper ID"]), pdf_lists[0], str(paper_info["Abstract"])
+                                    str(paper_info["Paper ID"]), pdf_path, str(paper_info["Abstract"])
                                 )
                             else:
                                 cur_paper = self._extract_df_information(paper_info)
