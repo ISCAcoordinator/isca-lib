@@ -314,7 +314,7 @@ class CMTSerialiser:
     def load_conference(
         self,
         conference_info_file: pathlib.Path,
-        sessions: dict[str, Session] | None = None,
+        sessions: list[Session] | None = None,
         papers: dict[str, Paper] | None = None,
     ) -> Conference:
 
@@ -356,7 +356,7 @@ class CMTSerialiser:
             chairs,
         )
         if sessions is not None:
-            for _, session in sessions.items():
+            for session in sessions:
                 conf.add_session(session)
         elif papers is not None:
             for _, paper in papers.items():
@@ -385,7 +385,7 @@ class CMTSerialiser:
                 "Paper Title": cur_paper.title,
                 "Paper Abstract": cur_paper.abstract,
                 "Author Emails": CMT_AUTHOR_SEP.join(author_emails),
-                "Author Names": CMT_AUTHOR_SEP.join(author_names)
+                "Author Names": CMT_AUTHOR_SEP.join(author_names),
             }
             list_papers.append(paper_info)
         df = pd.DataFrame(list_papers)
