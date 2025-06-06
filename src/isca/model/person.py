@@ -285,9 +285,20 @@ class Person:
         s = unidecode(s.lower())
         return s
 
-    def _generate_id(self):
+    def _generate_id(self) -> str:
         return f"{self.firstname} {self.lastname} ({self.email})"
 
     @property
-    def id(self):
+    def id(self) -> str:
         return self._id
+
+    def __repr__(self) -> str:
+        return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliations=[{self.affiliations}]), roles=({self._roles})"
+
+    def __str__(self) -> str:
+        return self.str_isca()
+
+    def __eq__(self, other) -> bool:
+        if self.id == other.id:
+            return True
+        return False
