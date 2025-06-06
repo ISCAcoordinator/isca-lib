@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 import pandas as pd
 
 # Model helpers
-from ..model.person import Person
+from ..model.person import Person, Affiliation, Role
 from ..model.paper import Paper
 from ..model.session import Session, OralSession, PosterSession, Room
 from ..model.event import Conference
@@ -33,6 +33,8 @@ CMT_SESSION_ROOMS_SHEET_NAME = "Rooms"
 CMT_SESSION_PAPER_SEPARATOR = ","
 
 CMT_CHAIR_CONF_SEPARATOR = ","
+
+CMT_ROLE_SEP = ";"
 
 
 ###############################################################################
@@ -84,6 +86,67 @@ class CMTSerialiser:
             id=str(paper_info["Paper ID"]),
         )
 
+    def load_user(self, user_spreadsheet_file: pathlib.Path) -> dict[str, Person]:
+        dict_users = dict()
+        wb = load_workbook(filename=user_spreadsheet_file)
+        for worksheet in wb.sheetnames:
+            df = pd.read_excel(user_spreadsheet_file, engine="openpyxl", sheet_name=worksheet)
+
+            for _, user_row in df.iterrows():
+                first_name = str(user_row["# First Name"]).strip()
+
+                middle_initial = ""
+                if not pd.isna(user_row["Middle Initial (optional)"]):
+                    middle_initial = str(user_row["Middle Initial (optional)"]).strip()
+
+                if pd.isna(user_row["Last Name"]) or (str(user_row["Last Name"]) == ""):
+                    last_name = first_name.strip()
+                    first_name = ""
+                else:
+                    last_name = str(user_row["Last Name"])
+
+                affiliation = Affiliation(
+                    institute=str(user_row["Organization"]).strip(),
+                    country=str(user_row["Country"]).strip(),
+                )
+                roles = set()
+                for r in str(user_row["Roles"]).split(CMT_ROLE_SEP):
+                    if r == "Reviewer":
+                        roles.add(Role.REVIEWER)
+                    elif r == "Author":
+                        roles.add(Role.AUTHOR)
+                    elif r == "Meta-Reviewer":
+                        roles.add(Role.META_REVIEWER)
+                    elif r == "Senior Meta-Reviewer":
+                        roles.add(Role.SENIOR_META_REVIEWER)
+                    elif r == "Proceeding-Editor":
+                        roles.add(Role.PROCEEDING_EDITOR)
+                    elif r == "Chair":
+                        roles.add(Role.CHAIR)
+                    elif r == "Track Chair":
+                        roles.add(Role.TRACK_CHAIR)
+                    elif r == "Setting-Reader":
+                        roles.add(Role.SETTING_READER)
+                    elif r == "Not in CMT":
+                        self._logger.debug(
+                            f'User "{str(user_row["Email"]).strip()}" is not part of CMT users, inferred to be an author'
+                        )
+                        roles.add(Role.AUTHOR)
+                    else:
+                        raise Exception(f'The role ("{r}") is unknown')
+
+                cur_user = Person(
+                    first_name.strip(),
+                    last_name.strip(),
+                    email=str(user_row["Email"]).strip(),
+                    roles=roles,
+                    affiliations=set([affiliation]),
+                    middle_initial=middle_initial,
+                )
+
+                dict_users[cur_user.id] = cur_user
+        return dict_users
+
     def load_submissions(
         self,
         submission_summary_file: pathlib.Path,
@@ -109,7 +172,6 @@ class CMTSerialiser:
 
                             if (not pdf_path.exists()) and (updated_paper_root_dir is not None):
                                 pdf_path = updated_paper_root_dir / f"{paper_id}.pdf"
-
 
                             if pdf_path.exists():
                                 cur_paper = load_pdf_information(
