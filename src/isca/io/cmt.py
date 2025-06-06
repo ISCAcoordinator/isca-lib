@@ -289,8 +289,8 @@ class CMTSerialiser:
     def load_conference(
         self,
         conference_info_file: pathlib.Path,
-        sessions: list[Session] | None = None,
-        papers: list[Paper] | None = None,
+        sessions: dict[str, Session] | None = None,
+        papers: dict[str, Paper] | None = None,
     ) -> Conference:
 
         if (sessions is not None) and (papers is not None):
@@ -303,6 +303,7 @@ class CMTSerialiser:
         with open(conference_info_file) as f_in:
             conf_info = yaml.load(f_in.read())
 
+        # NOTE: apparently autamtically converted into a date when loading the YAML configuration
         # # Convert the dates to datetime
         # conf_info["startDate"] = datetime.strptime(conf_info["startDate"], "%Y-%m-%d")
         # conf_info["endDate"] = datetime.strptime(conf_info["endDate"], "%Y-%m-%d")
@@ -330,10 +331,10 @@ class CMTSerialiser:
             chairs,
         )
         if sessions is not None:
-            for session in sessions:
+            for _, session in sessions.items():
                 conf.add_session(session)
         elif papers is not None:
-            for paper in papers:
+            for _, paper in papers.items():
                 conf.add_paper(paper)
 
         return conf
