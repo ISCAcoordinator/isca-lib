@@ -18,6 +18,8 @@ PDF_AUTHOR_RE = r"([^{]*) \{([^}]+)\}(?: \{([0-9, ]+)\})?"
 class WordException(Exception):
     pass
 
+class PDFMetadataException(Exception):
+    pass
 
 def _load_extended_metadata(doc: pymupdf.Document) -> dict[str, str]:
 
@@ -48,7 +50,7 @@ def _get_affiliations(metadata: dict[str, str]) -> dict[str, Affiliation]:
             department = department if department != "" else None
             affiliations[affiliation_key] = Affiliation(institute=m.group(3), country=m.group(4), department=department)
         else:
-            raise Exception(f'[Affiliation] This should not have happened: "{cur_affiliation}"')
+            raise PDFMetadataException(f'[Affiliation] This should not have happened: "{cur_affiliation}"')
 
     return affiliations
 
@@ -73,7 +75,7 @@ def _get_authors(metadata: dict[str, str], affiliations: dict[str, Affiliation] 
                 if m.group(3) is None:
                     aff_keys = list(affiliations.keys())
                     if len(aff_keys) > 1:
-                        raise ValueError(
+                        raise PDFMetadataException(
                             "No affiliations were given to the author, but multiple affiliations are available"
                         )
                     list_affiliations.append(affiliations[aff_keys[0]])
@@ -89,7 +91,7 @@ def _get_authors(metadata: dict[str, str], affiliations: dict[str, Affiliation] 
             cur_author = Person(first_name, last_name, email, affiliations=set(list_affiliations))
             list_authors.append(cur_author)
         else:
-            raise Exception(f'[Author] This should not have happened: "{cur_author}"')
+            raise PDFMetadataException(f'[Author] This should not have happened: "{cur_author}"')
 
     return list_authors
 
