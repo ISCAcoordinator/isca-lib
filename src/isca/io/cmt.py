@@ -270,6 +270,9 @@ class CMTSerialiser:
         list_sessions = []
         df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_SESSIONS_SHEET_NAME)
         for _, session_info in df.iterrows():
+            if pd.isna(session_info["Session name"]):
+                continue
+
             session_id = str(session_info["Session name"])
             session_name = str(session_info["Session title"])
 
