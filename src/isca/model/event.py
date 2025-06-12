@@ -53,9 +53,8 @@ class Conference(Event):
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
         # If the session is the presentation, need to adds the papers to the overall access
-        if isinstance(session, PresentationSession):
-            for paper in session.papers:
-                self.add_paper(paper, force_replace=False)
+        for paper in session.papers:
+            self.add_paper(paper, force_replace=False)
 
         self._sessions.append(session)
         self._sessions = sorted(self._sessions, key=lambda x: x.sort_criterion())  # Sort sessions by starting time
@@ -77,3 +76,6 @@ class Conference(Event):
     @property
     def sessions(self) -> list[Session]:
         return self._sessions.copy()
+
+    def __repr__(self) -> str:
+        return f"Conference({self.name}, start={self.start_date}, end={self.end_date}, chairs={self.chairs}, nb_papers={len(self.papers.keys())}, nb_sessions={len(self.sessions)})"
