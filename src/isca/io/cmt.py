@@ -35,7 +35,9 @@ CMT_SESSION_PAPER_SEPARATOR = ","
 CMT_CHAIR_CONF_SEPARATOR = ","
 
 CMT_ROLE_SEP = ";"
+CMT_AFFILIATION_SEPARATOR = "; "
 
+CMT_AUTHOR_REGEXP = re.compile(r'^([^(]*) \((.*)\)')
 
 ###############################################################################
 # Core of the module
@@ -62,21 +64,21 @@ class CMTSerialiser:
         for i_author, cur_author in enumerate(author_names):
             cur_author = cur_author.replace(CMT_CORRESPONDING_MARKER, "").strip()
 
-            # FIXME: check with martin how did he extract the first and last name
-            cur_author = re.sub(" \(.*\)", "", cur_author)
+            match_author = CMT_AUTHOR_REGEXP.match(cur_author)
+            if not match_author:
+                raise Exception("I seems that the authors used a semi-colon to separate their different affiliation. For now this needs to be fixed manually in the spreadsheet")
+
+
+            # Extract author information
+            cur_author = match_author.group(1)
             author_elts = cur_author.split(" ")
             last_name = author_elts[-1]
             first_name = " ".join(author_elts[:-1])
-            # last_name, first_name = cur_author.split(CMT_FIRST_LAST_STEP)
 
-            # FIXME: back to normal
-            first_name = first_name.replace(CMT_CORRESPONDING_MARKER, "")
-            if i_author < len(author_emails):
-                email = author_emails[i_author].replace(CMT_CORRESPONDING_MARKER, "")
-            else:
-                email = f'{".".join(author_elts)}@none.org'
+            # FIXME: As for now, we dunno how to extract the affiliation component, just consider an institute
+            affiliation = Affiliation(match_author.group(2), None, None)
 
-            cur_person = Person(first_name, last_name, email)
+            cur_person = Person(first_name, last_name, affiliations=set([affiliation]))
             paper_authors.append(cur_person)
 
         return Paper(
@@ -152,6 +154,7 @@ class CMTSerialiser:
         submission_summary_file: pathlib.Path,
         paper_root_dir: pathlib.Path | None = None,
         updated_paper_root_dir: pathlib.Path | None = None,
+        annuary: dict[str, Person] | None = None
     ) -> tuple[dict[str, Paper], dict[str, Person]]:
         dict_authors = dict()
         dict_papers = dict()
@@ -164,6 +167,7 @@ class CMTSerialiser:
             word_papers = 0
             no_pdf = 0
             for _, paper_info in df.iterrows():
+                pdf_path = None
                 if self.with_camera_ready:
                     try:
                         if paper_root_dir is not None:
@@ -225,6 +229,13 @@ class CMTSerialiser:
                         failed_papers += 1
                 else:
                     cur_paper = self._extract_df_information(paper_info)
+
+                # Link PDF
+                if pdf_path is not None:
+                    cur_paper.pdf_file = pdf_path.resolve()
+
+                # Add track
+                cur_paper.track = worksheet
 
                 dict_papers[cur_paper.id] = cur_paper
                 for cur_author in cur_paper.authors:
@@ -343,9 +354,10 @@ class CMTSerialiser:
                     elts = chair.strip().split(" ")
                     first_name = " ".join(elts[:-1])
                     last_name = elts[-1]
-                    chairs.append(
-                        Person(first_name, last_name, "noemail@nodomain.org")
-                    )  # FIXME: for now the email is slightly forced
+                    # FIXME: for now the email is slightly forced
+                    cur_chair = Person(first_name, last_name, "noemail@nodomain.org")
+                    cur_chair.add_role(Role.CHAIR)
+                    chairs.append(cur_chair)
 
         conf = Conference(
             conf_info["id"],
@@ -374,21 +386,26 @@ class CMTSerialiser:
                 author_str = f"{author.firstname} "
                 if author.middle_initial != "":
                     author_str += f"{author.middle_initial} "
-                author_str += f"{author.lastname}"
+                author_str += f"{{{author.lastname}}}"
 
                 # TODO: add affiliations
+                list_aff = []
+                for aff in author.affiliations:
+                    list_aff.append(str(aff))
+                author_str += f"({CMT_AFFILIATION_SEPARATOR.join(list_aff)})"
 
                 author_names.append(author_str)
 
             paper_info = {
-                "Paper ID": paper_id,
+                "Paper ID": int(paper_id),
                 "Paper Title": cur_paper.title,
                 "Paper Abstract": cur_paper.abstract,
-                "Author Emails": CMT_AUTHOR_SEP.join(author_emails),
+                # "Author Emails": CMT_AUTHOR_SEP.join(author_emails),
                 "Author Names": CMT_AUTHOR_SEP.join(author_names),
             }
             list_papers.append(paper_info)
         df = pd.DataFrame(list_papers)
+        df.sort_values("Paper ID", inplace=True)
 
         with pd.ExcelWriter(output_file, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
             df.to_excel(writer, sheet_name="papers", index=False)

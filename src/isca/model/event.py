@@ -28,6 +28,7 @@ class Conference(Event):
         self.chairs: list[Person] | None = chairs
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
+        self._annuary: dict[str, Person] = dict()
 
     def add_paper(self, paper: Paper, force_replace: bool = True):
         if (paper.id in self._papers) and (not force_replace):
