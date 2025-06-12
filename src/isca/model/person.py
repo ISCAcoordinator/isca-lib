@@ -1,6 +1,7 @@
 from enum import Enum
 from unidecode import unidecode
 import logging
+import pandas as pd
 
 
 class Affiliation:
@@ -16,22 +17,44 @@ class Affiliation:
         The country of the institute
     """
 
-    def __init__(self, institute: str, country: str, department: str | None = None):
+    def __init__(self, institute: str, country: str | None = None, department: str | None = None):
         """Initialisation method
 
         Parameters
         ----------
         institute : str
             The name of the institute
-        country : str
+        country : str, optional
             The country of the institute
         department : str, optional
             The name of the department, if any, else None [default: None]
         """
 
         self.department: str | None = department
+        self.country: str | None = country
         self.institute: str = institute
-        self.country: str = country
+
+    def __str__(self) -> str:
+        list_elts = []
+        if self.department is not None:
+            list_elts.append("{" + self.department + "}")
+        list_elts.append(self.institute)
+        if self.country is not None:
+            list_elts.append("{" + self.country + "}")
+        return ", ".join(list_elts)
+
+    def to_serie(self) -> pd.Series:
+        return pd.Series({"departement": self.department, "institute": self.institute, "country": self.country})
+
+    @classmethod
+    def from_serie(
+        cls, serie: pd.Series
+    ) -> "Affiliation":  # NOTE: typing return is a string until we move toward python 3.14
+        department = str(serie["department"]) if "department" in serie else None
+        institute = str(serie["institute"])
+        country = str(serie["country"]) if "country" in serie else None
+
+        return Affiliation(institute, country, department)
 
 
 class Role(Enum):
@@ -80,12 +103,12 @@ class Person:
 
     def __init__(
         self,
-        firstname: str,
+        firstname: str | None,
         lastname: str,
-        email: str,
+        email: str | None = None,
         roles: set[Role] = set([Role.DEFAULT]),
         affiliations: set[Affiliation] = set(),
-        middle_initial: str = "",
+        middle_initial: str | None = None,
         id: str | None = None,
     ):
         """Initialisation method
@@ -95,68 +118,26 @@ class Person:
 
         Parameters
         ----------
-        firstname : str
-            The first name of the person
+        firstname : str or None
+            The first name of the person (set to none if mono-name)
         lastname : str
             The last name of the person
-        email : str
-            The current email of the person
+        email : str, optional
+            The current email of the person (None if no email) [default: None]
         affiliation : Affiliation, optional
             The current affiliation of the person (None if no affiliation) [default: None]
         id: str, optional
             A given identifier for the person. This field should only be used for serialisation purposes!
         """
         self._logger = logging.getLogger(self.__class__.__name__)
-        self.firstname: str = firstname
+        self.firstname: str | None = firstname
         self.lastname: str = lastname
-        self.middle_initial: str = middle_initial
+        self.middle_initial: str | None = middle_initial
         self._roles: set[Role] = roles
-        self.email: str = email
+        self.email: str | None = email
         self.affiliations: set[Affiliation] = affiliations
 
         self._id: str = self._generate_id() if id is None else id
-
-    def __str__(self) -> str:
-
-        if not self.firstname:
-            return self.lastname
-
-        if self.middle_initial is not None:
-            user_str = f"{self.firstname} {self.middle_initial} {self.lastname}"
-        else:
-            user_str = f"{self.firstname} {self.lastname}"
-
-        return user_str
-
-    def __hash__(self) -> int:
-        """Hashing method which hashes the email to identify the user
-
-        Returns
-        -------
-        int
-            hash(self._email)
-        """
-        return hash(self.email)
-
-    def __eq__(self, other: object) -> bool:
-        """Equality testing
-
-        Parameters
-        ----------
-        self: type
-            description
-        other: object
-            The other object (instance of User!) to compare to the current one
-
-        Returns
-        -------
-        bool
-            True if both users have the same email
-        """
-        if not isinstance(other, Person):
-            return False
-
-        return other._id == self._id
 
     def get_organization(self, paper_id: int = -1) -> str:
         """Helper to get the organisation of the user
@@ -175,30 +156,6 @@ class Person:
             The organisation
         """
         raise NotImplementedError("This method is not yet implemented")
-
-    def str_isca(self) -> str:
-        """Get the User formatted as the ISCA archive requires.
-
-        This implies that the user will be formatted as "<First Name> {<Last Name>}" if the last name contains a space.
-
-        Returns
-        -------
-        str
-            the ISCA formatted user name ()
-        """
-        last_name = self.lastname
-        if " " in last_name:
-            last_name = f"{{{last_name}}}"
-
-        if not self.firstname:
-            return last_name
-
-        if self.middle_initial is not None:
-            user_str = f"{self.firstname} {self.middle_initial} {last_name}"
-        else:
-            user_str = f"{self.firstname} {last_name}"
-
-        return user_str
 
     def str_with_organization(self, paper_id: int = -1) -> str:
         """Get string version of the user with its organisation.
@@ -292,13 +249,87 @@ class Person:
     def id(self) -> str:
         return self._id
 
+    def __hash__(self) -> int:
+        """Hashing method which hashes the email to identify the user
+
+        Returns
+        -------
+        int
+            hash(self._id)
+        """
+        return hash(self._id)
+
     def __repr__(self) -> str:
         return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliations=[{self.affiliations}]), roles=({self._roles})"
 
     def __str__(self) -> str:
-        return self.str_isca()
+        last_name = self.lastname
+        if " " in last_name:
+            last_name = f"{{{last_name}}}"
+
+        if not self.firstname:
+            return last_name
+
+        if self.middle_initial is not None:
+            user_str = f"{self.firstname} {self.middle_initial} {last_name}"
+        else:
+            user_str = f"{self.firstname} {last_name}"
+
+        return user_str
 
     def __eq__(self, other) -> bool:
+        if not isinstance(other, Person):
+            return False
+
         if self.id == other.id:
             return True
         return False
+
+    def str_with_flatten_affiliations(self) -> str:
+
+        output = str(self)
+
+        aff_list = []
+        for cur_aff in self.affiliations:
+            aff_list.append(str(cur_aff))
+
+        output += " (" + "; ".join(aff_list) + ")"  # TODO: fix this
+        return output
+
+    def to_serie(self, with_flatten_affiliations=False) -> pd.Series:
+
+        current_serie = pd.Series(
+            {
+                "id": self.id,
+                "First Name": self.firstname,
+                "Middle Initial": self.middle_initial,
+                "Last Name": self.lastname,
+                "email": self.email,
+                "roles": ", ".join([str(r) in self._roles]),
+            }
+        )
+
+        if with_flatten_affiliations:
+            for i_aff, cur_aff in enumerate(self.affiliations):
+                aff_serie = cur_aff.to_serie()
+                for k, v in aff_serie.items():
+                    current_serie[f"{k}{i_aff}"] = v
+
+        return current_serie
+
+    @classmethod
+    def from_serie(
+        cls, serie: pd.Series
+    ) -> "Person":  # NOTE: typing return is a string until we move toward python 3.14
+
+        lastname = str(serie["lastname"])  # NOTE: this is the only mandatory field!
+        id = str(serie["id"]) if "id" in serie else None
+        firstname = str(serie["firstname"]) if "firstname" in serie else None
+        middle_initial = str(serie["middle_initial"]) if "middle_initial" in serie else None
+
+        email = str(serie["email"]) if "email" in serie else None
+        roles = set()
+
+        return Person(
+            id=id, firstname=firstname, middle_initial=middle_initial, lastname=lastname, email=email, roles=roles
+        )
