@@ -107,6 +107,6 @@ def load_pdf_information(paper_id: str, pdf_file: pathlib.Path, abstract: str) -
 
     affiliations = _get_affiliations(metadata)
     authors = _get_authors(metadata, affiliations)
-    title = metadata[PDF_TITLE_KEY]
+    title = metadata[PDF_TITLE_KEY].replace("\n", " ")
 
-    return Paper(title, authors, abstract, pdf_file, id=paper_id)
+    return Paper(title, authors, abstract, pdf_file, metadata_from_pdf=True, id=paper_id)
