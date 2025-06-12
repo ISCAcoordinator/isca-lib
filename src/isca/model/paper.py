@@ -37,6 +37,8 @@ class Paper:
         presenters: list[Person] | None = None,
         reviewers: list[Person] | None = None,
         alternative_affiliations: dict[Person, Affiliation] | None = None,
+        track: str | None = None,
+        metadata_from_pdf: bool = False,
         id: str | None = None,
     ):
         """Initialisation method
@@ -69,6 +71,8 @@ class Paper:
         self.alternative_affiliations: dict[Person, Affiliation] = (
             alternative_affiliations if alternative_affiliations is not None else dict()
         )
+        self.metadata_from_pdf: bool = metadata_from_pdf
+        self.track: str | None = track
 
         self._id: str | None = id
 
