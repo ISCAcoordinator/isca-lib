@@ -2,14 +2,16 @@
 from datetime import datetime
 import logging
 import pathlib
+import re
 
 # Data loading
 import json
+import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Role
-from ..model.paper import Paper, PublishedPaper
-from ..model.session import Session, OralSession, PosterSession, Room
+from ..model.paper import Paper
+from ..model.session import Session
 from ..model.event import Conference
 
 
@@ -18,11 +20,16 @@ from ..model.event import Conference
 ###############################################################################
 ARCHIVE_CHAIRS_PREFIX = "Chairs:"
 ARCHIVE_CHAIRS_SEP = ", "
+ARCHIVE_CONF_SEPARATOR = "="
+ARCHIVE_INPUT_DATA_SEP = "|"
+ARCHIVE_INPUT_DATA_AUTHOR_SEP = ", "
+ARCHIVE_INPUT_DATA_PAPER_SEP = ", "
+ARCHIVE_INPUT_AUTHOR_REGEXP = re.compile("([^{]*) {([^}]*)}")
 
 ###############################################################################
 # Core of the module
 ###############################################################################
-class ArchiveSerialiser:
+class PublishedArchiveSerialiser:
     def __init__(self):
         self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -157,3 +164,92 @@ class ArchiveSerialiser:
 
         with open(metadata_file, "w") as f_out:
             f_out.write(json.dumps(dict_out, indent=2))
+
+
+class ArchiveInputSerialiser:
+    def __init__(self):
+        self._logger = logging.getLogger(self.__class__.__name__)
+
+    def load(self, metadata_conf_file: pathlib.Path) -> Conference:
+
+        # Load papers
+        papers_metadata = pd.read_csv(metadata_conf_file.parent/"papers.txt", sep=ARCHIVE_INPUT_DATA_SEP)
+        papers = dict()
+        for _, paper in papers_metadata.iterrows():
+            authors = []
+            for author in paper.authors.split(ARCHIVE_INPUT_DATA_AUTHOR_SEP):
+                author = author.strip()
+                m = ARCHIVE_INPUT_AUTHOR_REGEXP.match(author)
+                if m:
+                    first_name = m.group(1)
+                    last_name = m.group(2)
+                else:
+                    author_elts = author.split(" ")
+                    first_name = " ".join(author_elts[:-1])
+                    last_name = author_elts[-1]
+
+                authors.append(Person(first_name, last_name, None, set([Role.AUTHOR])))
+
+            abstract = ""
+            with open(metadata_conf_file.parent/f"abstracts/{paper.id}.txt") as f_abstract:
+                abstract = str(f_abstract.read()).strip()
+
+            cur_paper = Paper(
+                paper.title,
+                authors,
+                abstract,
+                (metadata_conf_file.parent/f"pdfs/{paper.id}.pdf").resolve(),
+                id = paper.id
+            )
+            papers[paper.id] = cur_paper
+
+        # Load sessions
+        sessions_metadata = pd.read_csv(metadata_conf_file.parent/"sessions.txt", sep=ARCHIVE_INPUT_DATA_SEP)
+        sessions = list()
+        for session_idx, session in sessions_metadata.iterrows():
+            papers_in_session = []
+            for paper_id in session.papers.split(ARCHIVE_INPUT_DATA_PAPER_SEP):
+                papers_in_session.append(papers[paper_id])
+            cur_session = Session(
+                str(session_idx),
+                session.title,
+                papers_in_session
+            )
+            sessions.append(cur_session)
+
+        # Load the conference
+        metadata_conf = dict()
+        with open(metadata_conf_file) as f_conf:
+            for l in f_conf.readlines():
+                elts = [e.strip() for e in l.split(ARCHIVE_CONF_SEPARATOR)]
+                metadata_conf[elts[0]] = elts[1]
+
+        start_date = datetime.strptime(metadata_conf["startDate"], "%d/%m/%Y")
+        end_date = datetime.strptime(metadata_conf["endDate"], "%d/%m/%Y")
+
+        chairs = []
+        if "chair" in metadata_conf:
+            for chair in metadata_conf["chair"].replace(ARCHIVE_CHAIRS_PREFIX, "").split(ARCHIVE_CHAIRS_SEP):
+                chair = chair.strip()
+                elts = chair.split(" ")
+                first_name = " ".join(elts[:-1])
+                last_name = elts[-1]
+                email = f'{".".join(elts)}@none.org' # FIXME: email issue here!
+                chairs.append(Person(first_name, last_name, email, set([Role.CHAIR])))
+
+        conf = Conference(
+            metadata_conf_file.stem,
+            metadata_conf["title"],
+            start_date,
+            end_date,
+            metadata_conf["series"] if "series" in metadata_conf else None,
+            chairs
+        )
+
+        for session in sessions:
+            conf.add_session(session)
+
+        return conf
+
+    def dump(self, conf: Conference, metadata_file: pathlib.Path, pdf_root_path: pathlib.Path | None = None):
+        raise NotImplementedError("Not yet implemented")
