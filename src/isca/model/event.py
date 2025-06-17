@@ -6,12 +6,21 @@ from .session import Session, PresentationSession
 
 
 class Event:
-    def __init__(self, id: str, name: str, start_date: datetime.date, end_date: datetime.date, serie: str | None):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        start_date: datetime.date,
+        end_date: datetime.date,
+        location: str | None = None,
+        url: str | None = None,
+    ):
         self._id: str = id
         self.name: str = name
-        self.serie: str | None = serie
         self.start_date: datetime.date = start_date
         self.end_date: datetime.date = end_date
+        self.location: str | None = location
+        self.url: str | None = url
 
 
 class Conference(Event):
@@ -21,10 +30,17 @@ class Conference(Event):
         name: str,
         start_date: datetime.date,
         end_date: datetime.date,
+        location: str | None = None,
+        url: str | None = None,
         serie: str | None = None,
         chairs: list[Person] | None = None,
+        issn: str | None = None,
+        generate_doi: bool = False,
     ):
-        super().__init__(id, name, start_date, end_date, serie)
+        super().__init__(id, name, start_date, end_date, location, url)
+        self.serie: str | None = serie
+        self.issn: str | None = issn
+        self.generate_doi: bool = generate_doi
         self.chairs: list[Person] | None = chairs
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
