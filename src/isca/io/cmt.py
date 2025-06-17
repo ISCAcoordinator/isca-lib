@@ -364,8 +364,12 @@ class CMTSerialiser:
             conf_info["name"],
             conf_info["startDate"],
             conf_info["endDate"],
-            conf_info["serie"] if "serie" in conf_info else None,
+            conf_info["location"] if "location" in conf_info else None,
+            conf_info["URL"] if "URL" in conf_info else None,
+            conf_info["series"] if "series" in conf_info else None,
             chairs,
+            conf_info["ISSN"] if "ISSN" in conf_info else None,
+            conf_info["generateDOIs"] if "generateDOIs" in conf_info else False,
         )
         if sessions is not None:
             for session in sessions:
