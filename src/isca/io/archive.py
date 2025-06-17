@@ -94,8 +94,12 @@ class PublishedArchiveSerialiser:
             metadata["title"],
             start_date,
             end_date,
+            metadata["location"] if "location" in metadata else None,
+            metadata["URL"] if "URL" in metadata else None,
             metadata["series"] if "series" in metadata else None,
-            chairs
+            chairs,
+            metadata["ISSN"] if "ISSN" in metadata else None,
+            True if ("generateDOIs" in metadata) and (metadata["generateDOIs"].lower() == "yes") else False,
         )
 
         for session in sessions:
@@ -108,24 +112,33 @@ class PublishedArchiveSerialiser:
         if len(conf.sessions) == 0:
             raise Exception("The conference should have sessions to be able to saved in the archive")
 
-        chairs = []
-        if conf.chairs is not None:
-            for chair in conf.chairs:
-                cur_chair = f"{chair.firstname} {chair.lastname}"
-                chairs.append(cur_chair)
-        # Initialise using conference info
+
+        # Fill conference meta information
         dict_out: dict[str, Any] = {
             "title": conf.name,
             "startDate": conf.start_date.strftime("%d/%m/%Y"),
             "endDate": conf.end_date.strftime("%d/%m/%Y"),
         }
-        if len(chairs) > 0:
+        if conf.url is not None:
+            dict_out["URL"] = conf.url
+        if conf.location is not None:
+            dict_out["location"] = conf.location
+        if conf.generate_doi:
+            dict_out["generateDOIs"] = "yes"
+        if conf.issn is not None:
+            dict_out["ISSN"] = conf.issn
+
+        if conf.chairs is not None:
+            chairs = []
+            for chair in conf.chairs:
+                cur_chair = f"{chair.firstname} {chair.lastname}"
+                chairs.append(cur_chair)
             dict_out["chair"] = f"{ARCHIVE_CHAIRS_PREFIX} {ARCHIVE_CHAIRS_SEP.join(chairs)}"
 
         if conf.serie is not None:
             dict_out["series"] = conf.serie
 
-        # Conference part
+        # Add conference content
         dict_out["papers"] = {}
         dict_out["sessions"] = []
         for session in conf.sessions:
@@ -163,7 +176,7 @@ class PublishedArchiveSerialiser:
                 dict_out["papers"][paper.id] = cur_paper
             dict_out["sessions"].append(cur_session)
 
-
+        # Finally dump
         with open(metadata_file, "w") as f_out:
             f_out.write(json.dumps(dict_out, indent=2))
 
@@ -243,8 +256,12 @@ class ArchiveInputSerialiser:
             metadata_conf["title"],
             start_date,
             end_date,
+            metadata_conf["location"] if "location" in metadata_conf else None,
+            metadata_conf["URL"] if "URL" in metadata_conf else None,
             metadata_conf["series"] if "series" in metadata_conf else None,
-            chairs
+            chairs,
+            metadata_conf["ISSN"] if "ISSN" in metadata_conf else None,
+            True if ("generateDOIs" in metadata_conf) and (metadata_conf["generateDOIs"].lower() == "yes") else False,
         )
 
         for session in sessions:
@@ -305,20 +322,26 @@ class ArchiveInputSerialiser:
                 f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
                 f_sessions.write("\n")
 
-        # And finally create configuration file
-        chairs = []
-        if conf.chairs is not None:
-            for chair in conf.chairs:
-                cur_chair = f"{chair.firstname} {chair.lastname}"
-                chairs.append(cur_chair)
-
         # Initialise using conference info
         dict_out = {
             "title": conf.name,
             "startDate": conf.start_date.strftime("%d/%m/%Y"),
             "endDate": conf.end_date.strftime("%d/%m/%Y"),
         }
-        if len(chairs) > 0:
+        if conf.url is not None:
+            dict_out["URL"] = conf.url
+        if conf.location is not None:
+            dict_out["location"] = conf.location
+        if conf.generate_doi:
+            dict_out["generateDOIs"] = "yes"
+        if conf.issn is not None:
+            dict_out["ISSN"] = conf.issn
+
+        if conf.chairs is not None:
+            chairs = []
+            for chair in conf.chairs:
+                cur_chair = f"{chair.firstname} {chair.lastname}"
+                chairs.append(cur_chair)
             dict_out["chair"] = f"{ARCHIVE_CHAIRS_PREFIX} {ARCHIVE_CHAIRS_SEP.join(chairs)}"
 
         if conf.serie is not None:
