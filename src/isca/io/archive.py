@@ -252,5 +252,79 @@ class ArchiveInputSerialiser:
 
         return conf
 
-    def dump(self, conf: Conference, metadata_file: pathlib.Path, pdf_root_path: pathlib.Path | None = None):
-        raise NotImplementedError("Not yet implemented")
+    def dump(self, conf: Conference, metadata_file: pathlib.Path):
+
+        # Prepare directory
+        abstracts_dir = metadata_file.parent/"abstracts"
+        abstracts_dir.mkdir(exist_ok=True, parents=True)
+        pdfs_dir = metadata_file.parent/"pdfs"
+        pdfs_dir.mkdir(exist_ok=True, parents=True)
+
+        # Create paper file
+        with open(metadata_file.parent/"papers.txt", "w") as f_papers:
+            f_papers.write(ARCHIVE_INPUT_DATA_SEP.join(["id", "title", "authors"]))
+            f_papers.write("\n")
+
+            for paper_id, paper in conf.papers.items():
+
+                list_authors = []
+                for author in paper.authors:
+
+                    cur_author = ""
+                    if author.firstname:
+                        cur_author += author.firstname + " "
+
+                    if author.middle_initial:
+                        cur_author += author.middle_initial + " "
+
+                    cur_author += f"{{{author.lastname}}}"
+                    list_authors.append(cur_author)
+
+                authors = ARCHIVE_INPUT_DATA_AUTHOR_SEP.join(list_authors)
+                f_papers.write(ARCHIVE_INPUT_DATA_SEP.join([str(paper_id), paper.title, authors]))
+                f_papers.write("\n")
+
+                # Save abstract
+                if paper.abstract is None:
+                    raise Exception(f"{paper_id} doesn't have any abstract, this is incompatible with the ISCA archive")
+
+                with open(abstracts_dir/f"{paper_id}.txt", "w") as f_abstract:
+                    f_abstract.write(paper.abstract)
+
+                # Save PDF
+                if paper.pdf_file is not None:
+                    shutil.copy(paper.pdf_file.resolve(), pdfs_dir/f"{paper_id}.pdf")
+
+        # Create session file
+        with open(metadata_file.parent/"sessions.txt", "w") as f_sessions:
+            f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
+            f_sessions.write("\n")
+
+            for session in conf.sessions:
+                papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join([str(paper.id) for paper in session.papers])
+                f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
+                f_sessions.write("\n")
+
+        # And finally create configuration file
+        chairs = []
+        if conf.chairs is not None:
+            for chair in conf.chairs:
+                cur_chair = f"{chair.firstname} {chair.lastname}"
+                chairs.append(cur_chair)
+
+        # Initialise using conference info
+        dict_out = {
+            "title": conf.name,
+            "startDate": conf.start_date.strftime("%d/%m/%Y"),
+            "endDate": conf.end_date.strftime("%d/%m/%Y"),
+        }
+        if len(chairs) > 0:
+            dict_out["chair"] = f"{ARCHIVE_CHAIRS_PREFIX} {ARCHIVE_CHAIRS_SEP.join(chairs)}"
+
+        if conf.serie is not None:
+            dict_out["series"] = conf.serie
+
+        with open(metadata_file, "w") as f_conf:
+            for k, v in dict_out.items():
+                f_conf.write(f" {ARCHIVE_CONF_SEPARATOR} ".join([k, v]))
+                f_conf.write("\n")
