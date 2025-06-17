@@ -1,8 +1,10 @@
 # Python
+from typing import Any
 from datetime import datetime
 import logging
 import pathlib
 import re
+import shutil
 
 # Data loading
 import json
@@ -10,7 +12,7 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Role
-from ..model.paper import Paper
+from ..model.paper import Paper, PublishedPaper
 from ..model.session import Session
 from ..model.event import Conference
 
@@ -112,7 +114,7 @@ class PublishedArchiveSerialiser:
                 cur_chair = f"{chair.firstname} {chair.lastname}"
                 chairs.append(cur_chair)
         # Initialise using conference info
-        dict_out = {
+        dict_out: dict[str, Any] = {
             "title": conf.name,
             "startDate": conf.start_date.strftime("%d/%m/%Y"),
             "endDate": conf.end_date.strftime("%d/%m/%Y"),
@@ -234,8 +236,7 @@ class ArchiveInputSerialiser:
                 elts = chair.split(" ")
                 first_name = " ".join(elts[:-1])
                 last_name = elts[-1]
-                email = f'{".".join(elts)}@none.org' # FIXME: email issue here!
-                chairs.append(Person(first_name, last_name, email, set([Role.CHAIR])))
+                chairs.append(Person(first_name, last_name, None, set([Role.CHAIR])))
 
         conf = Conference(
             metadata_conf_file.stem,
