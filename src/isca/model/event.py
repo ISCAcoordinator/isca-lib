@@ -44,6 +44,7 @@ class Conference(Event):
         self.chairs: list[Person] | None = chairs
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
+        self._authors2papers: dict[Person, list[Paper]] = dict()
         self._annuary: dict[str, Person] = dict()
 
     def add_paper(self, paper: Paper, force_replace: bool = True):
@@ -85,6 +86,26 @@ class Conference(Event):
                 self.add_paper(paper, force_replace=False)
 
         self._sessions.remove(session)
+
+    def resolve_author_paper_association(self):
+        for paper in self._papers.values():
+            for author in paper.authors:
+                if author not in self._authors2papers:
+                    self._authors2papers[author] = []
+                self._authors2papers[author].append(paper)
+
+    def list_papers(self, author: Person) -> list[Paper]:
+        if (author not in self._authors2papers):
+            return []
+
+        return self._authors2papers[author]
+
+    @property
+    def authors(self) -> set[Person]:
+        authors = set()
+        for paper in self._papers.values():
+            authors.update(paper.authors)
+        return authors
 
     @property
     def papers(self) -> dict[str, Paper]:
