@@ -37,16 +37,17 @@ CMT_CHAIR_CONF_SEPARATOR = ","
 CMT_ROLE_SEP = ";"
 CMT_AFFILIATION_SEPARATOR = "; "
 
-CMT_AUTHOR_REGEXP = re.compile(r'^([^(]*) \((.*)\)')
+CMT_AUTHOR_REGEXP = re.compile(r"^([^(]*) \((.*)\)")
+
 
 ###############################################################################
 # Core of the module
 ###############################################################################
 class CMTSerialiser:
-    def __init__(self, with_camera_ready: bool = False, session_unplanned: bool = False):
+    def __init__(self, with_camera_ready: bool = False, ignore_sessions: bool = False):
         self._logger = logging.getLogger(self.__class__.__name__)
         self.with_camera_ready = with_camera_ready
-        self.session_unplanned = session_unplanned
+        self.ignore_sessions = ignore_sessions
         if not with_camera_ready:
             self._logger.warning(
                 "Metadata extracted from the CMT spreadsheet, likely to be highly inconsistent!",
@@ -56,9 +57,9 @@ class CMTSerialiser:
         author_names = str(paper_info["Author Names"]).split(CMT_AUTHOR_SEP)
         author_emails = str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)
 
-        # assert len(author_emails) == len(
-        #     author_names
-        # ), f"The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
+        assert len(author_emails) == len(
+            author_names
+        ), f"[{paper_info.id}] The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
 
         paper_authors = list()
         for i_author, cur_author in enumerate(author_names):
@@ -66,19 +67,23 @@ class CMTSerialiser:
 
             match_author = CMT_AUTHOR_REGEXP.match(cur_author)
             if not match_author:
-                raise Exception("I seems that the authors used a semi-colon to separate their different affiliation. For now this needs to be fixed manually in the spreadsheet")
-
+                raise Exception(
+                    f"It seems that the authors used a semi-colon to separate their different affiliation. For now this needs to be fixed manually in the spreadsheet: {cur_author}"
+                )
 
             # Extract author information
             cur_author = match_author.group(1)
             author_elts = cur_author.split(" ")
+            author_elts = list(
+                filter(None, author_elts)
+            )  # NOTE: helpers to ignore empty elements due to multiple space
             last_name = author_elts[-1]
             first_name = " ".join(author_elts[:-1])
-
+            email = author_emails[i_author]
             # FIXME: As for now, we dunno how to extract the affiliation component, just consider an institute
             affiliation = Affiliation(match_author.group(2), None, None)
 
-            cur_person = Person(first_name, last_name, affiliations=set([affiliation]))
+            cur_person = Person(first_name, last_name, email=email, affiliations=set([affiliation]))
             paper_authors.append(cur_person)
 
         return Paper(
@@ -88,8 +93,52 @@ class CMTSerialiser:
             id=str(paper_info["Paper ID"]),
         )
 
-    def load_user(self, user_spreadsheet_file: pathlib.Path) -> dict[str, Person]:
-        dict_users = dict()
+    def load(self, conf_metadata_file: pathlib.Path) -> Conference:
+        yaml = YAML(typ="rt", pure=True)
+        with open(conf_metadata_file) as f_in:
+            conf_info = yaml.load(f_in.read())
+
+        if conf_info["input_data"]["root_dir"].startswith("/"):
+            input_root_dir = conf_info["input_data"]["root_dir"]
+        else:
+            input_root_dir = conf_metadata_file.parent / conf_info["input_data"]["root_dir"]
+
+        if conf_info["input_data"]["pdfs_dir"].startswith("/"):
+            pdfs_path = pathlib.Path(conf_info["input_data"]["pdfs_dir"])
+        else:
+            pdfs_path = input_root_dir / conf_info["input_data"]["pdfs_dir"]
+
+        if conf_info["input_data"]["updated_pdfs_dir"].startswith("/"):
+            updated_pdfs_path = pathlib.Path(conf_info["input_data"]["updated_pdfs_dir"])
+        else:
+            updated_pdfs_path = input_root_dir / conf_info["input_data"]["updated_pdfs_dir"]
+
+        if conf_info["input_data"]["metadata_spreadsheet"].startswith("/"):
+            metadata_file = pathlib.Path(conf_info["input_data"]["metadata_spreadsheet"])
+        else:
+            metadata_file = input_root_dir / conf_info["input_data"]["metadata_spreadsheet"]
+
+        if conf_info["input_data"]["users_spreadsheet"].startswith("/"):
+            user_file = pathlib.Path(conf_info["input_data"]["users_spreadsheet"])
+        else:
+            user_file = input_root_dir / conf_info["input_data"]["users_spreadsheet"]
+
+        if conf_info["input_data"]["sessions_spreadsheet"].startswith("/"):
+            session_file = pathlib.Path(conf_info["input_data"]["sessions_spreadsheet"])
+        else:
+            session_file = input_root_dir / conf_info["input_data"]["sessions_spreadsheet"]
+
+        annuary = self.load_users(user_file)
+        papers, annuary = self.load_papers(metadata_file, pdfs_path, updated_pdfs_path, annuary)
+
+        if self.ignore_sessions:
+            return self.load_conference(conf_metadata_file, papers=papers, annuary=annuary)
+        else:
+            sessions = self.load_sessions(session_file, papers)
+            return self.load_conference(conf_metadata_file, sessions=sessions, annuary=annuary)
+
+    def load_users(self, user_spreadsheet_file: pathlib.Path) -> set[Person]:
+        users = set()
         wb = load_workbook(filename=user_spreadsheet_file)
         for worksheet in wb.sheetnames:
             df = pd.read_excel(user_spreadsheet_file, engine="openpyxl", sheet_name=worksheet)
@@ -111,6 +160,7 @@ class CMTSerialiser:
                     institute=str(user_row["Organization"]).strip(),
                     country=str(user_row["Country"]).strip(),
                 )
+
                 roles = set()
                 for r in str(user_row["Roles"]).split(CMT_ROLE_SEP):
                     if r == "Reviewer":
@@ -146,17 +196,20 @@ class CMTSerialiser:
                     middle_initial=middle_initial,
                 )
 
-                dict_users[cur_user.id] = cur_user
-        return dict_users
+                users.add(cur_user)
+
+        return users
 
     def load_papers(
         self,
         submission_summary_file: pathlib.Path,
         paper_root_dir: pathlib.Path | None = None,
         updated_paper_root_dir: pathlib.Path | None = None,
-        annuary: dict[str, Person] | None = None
-    ) -> tuple[dict[str, Paper], dict[str, Person]]:
-        dict_authors = dict()
+        annuary: set[Person] | None = None,
+    ) -> tuple[dict[str, Paper], set[Person]]:
+        if annuary is None:
+            annuary = set()
+
         dict_papers = dict()
 
         wb = load_workbook(filename=submission_summary_file)
@@ -239,7 +292,7 @@ class CMTSerialiser:
 
                 dict_papers[cur_paper.id] = cur_paper
                 for cur_author in cur_paper.authors:
-                    dict_authors[cur_author.id] = cur_author
+                    annuary.add(cur_author)
 
             self._logger.info(
                 f"[{worksheet}] total number of submissions {total_papers}: "
@@ -247,7 +300,8 @@ class CMTSerialiser:
                 + f"word_papers={word_papers} ({word_papers/total_papers*100:.2f}%), "
                 + f"nopdf ={no_pdf} ({no_pdf/total_papers*100:.2f}%)"
             )
-        return dict_papers, dict_authors
+
+        return dict_papers, annuary
 
     def load_sessions(self, session_summary_file: pathlib.Path, dict_papers: dict[str, Paper] = {}) -> list[Session]:
 
@@ -288,24 +342,21 @@ class CMTSerialiser:
             session_name = str(session_info["Session title"])
 
             # Create the sessions
-            if self.session_unplanned:
-                cur_session = Session(session_id, session_name)
-            else:
-                # TODO: Get time from the time slots, now this is just a place holder
-                cur_time_slot = dict_timeslots[session_info["Timeslot name"]]
-                cur_room = dict_room[session_info["Room name"]]
+            # TODO: Get time from the time slots, now this is just a place holder
+            cur_time_slot = dict_timeslots[session_info["Timeslot name"]]
+            cur_room = dict_room[session_info["Room name"]]
 
-                session_type = str(session_info["Session type"])
-                if session_type.lower() == "oral":
-                    cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
-                elif session_type.lower() == "poster":
-                    cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
-                else:
-                    self._logger.error(
-                        f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
-                        extra={"session_id": session_id, "session_name": session_name},
-                    )
-                    continue
+            session_type = str(session_info["Session type"])
+            if session_type.lower() == "oral":
+                cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            elif session_type.lower() == "poster":
+                cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            else:
+                self._logger.error(
+                    f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
+                    extra={"session_id": session_id, "session_name": session_name},
+                )
+                continue
 
             # Now deal add the papers
             session_paper_ids = [
@@ -327,12 +378,16 @@ class CMTSerialiser:
         conference_info_file: pathlib.Path,
         sessions: list[Session] | None = None,
         papers: dict[str, Paper] | None = None,
+        annuary: set[Person] | None = None,
     ) -> Conference:
 
         if (sessions is not None) and (papers is not None):
             raise Exception(
                 "Either the sessions OR the papers should be given. The papers will be loaded from the sessions. In case no sessions, the provide the papers."
             )
+
+        if annuary is None:
+            annuary = set()
 
         conf_info = dict()
         yaml = YAML(typ="rt", pure=True)
