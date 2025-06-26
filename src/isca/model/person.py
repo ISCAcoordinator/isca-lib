@@ -3,7 +3,6 @@ from unidecode import unidecode
 import logging
 import pandas as pd
 
-
 class Affiliation:
     """An affiliation to be associated to a person
 
@@ -37,7 +36,7 @@ class Affiliation:
     def __str__(self) -> str:
         list_elts = []
         if self.department is not None:
-            list_elts.append("{" + self.department + "}")
+            list_elts.append("[" + self.department + "]")
         list_elts.append(self.institute)
         if self.country is not None:
             list_elts.append("{" + self.country + "}")
