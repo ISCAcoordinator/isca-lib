@@ -343,8 +343,8 @@ class CMTSerialiser:
 
             # Create the sessions
             # TODO: Get time from the time slots, now this is just a place holder
-            cur_time_slot = dict_timeslots[session_info["Timeslot name"]]
-            cur_room = dict_room[session_info["Room name"]]
+            cur_time_slot = dict_timeslots[session_info["Timeslot name*"]]
+            cur_room = dict_room[session_info["Room name*"]] # FIXME: why this "*"?
 
             session_type = str(session_info["Session type"])
             if session_type.lower() == "oral":
@@ -370,6 +370,8 @@ class CMTSerialiser:
                     )
                     continue
                 cur_session.add_paper(dict_papers[paper_id])
+
+            self._logger.debug(f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session})
             list_sessions.append(cur_session)
         return list_sessions
 
