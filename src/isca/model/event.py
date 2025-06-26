@@ -2,7 +2,7 @@ import datetime
 
 from .paper import Paper
 from .person import Person
-from .session import Session, PresentationSession
+from .session import Session, PresentationSession, Room
 
 
 class Event:
@@ -102,10 +102,14 @@ class Conference(Event):
 
     @property
     def authors(self) -> set[Person]:
-        authors = set()
-        for paper in self._papers.values():
-            authors.update(paper.authors)
-        return authors
+        return set(self.authors_with_papers.keys())
+
+    @property
+    def authors_with_papers(self) -> dict[Person, list[Paper]]:
+        if not self._authors2papers.keys():
+            self.resolve_author_paper_association()
+
+        return self._authors2papers
 
     @property
     def papers(self) -> dict[str, Paper]:
@@ -114,6 +118,14 @@ class Conference(Event):
     @property
     def sessions(self) -> list[Session]:
         return self._sessions.copy()
+
+    @property
+    def rooms(self) -> set[Room]:
+        rooms = set()
+        for cur_session in self.sessions:
+            if isinstance(cur_session, PresentationSession):
+                rooms.add(cur_session.room)
+        return rooms
 
     def __repr__(self) -> str:
         return f"Conference({self.name}, start={self.start_date}, end={self.end_date}, chairs={self.chairs}, nb_papers={len(self.papers.keys())}, nb_sessions={len(self.sessions)})"
