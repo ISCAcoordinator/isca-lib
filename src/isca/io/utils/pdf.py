@@ -5,7 +5,7 @@ import pymupdf
 
 from ...model.person import Affiliation
 from ...model.person import Person
-from ...model.paper import Paper
+from ...model.item import Paper
 
 PDF_WORD_KEYWORD = "INTERSPEECH2025_WORD_TEMPLATE"
 PDF_AFFILIATION_KEY = "Affiliation"

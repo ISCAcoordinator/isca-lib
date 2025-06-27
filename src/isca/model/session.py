@@ -1,15 +1,14 @@
 import datetime
 
 from .person import Person
-from .paper import Paper
+from .item import Paper
 
 
 class Room:
-    def __init__(self, name: str, type: str, capacity: int|tuple[int]|list[int]|None):
+    def __init__(self, name: str, type: str, capacity: int | tuple[int] | list[int] | None):
         self.name: str = name
         self.type: str = type
-        self.capacity: int|tuple[int]|list[int]|None = capacity
-
+        self.capacity: int | tuple[int] | list[int] | None = capacity
 
     def __str__(self) -> str:
         str = f"{self.name}"
@@ -17,6 +16,7 @@ class Room:
             str += f" (capacity={self.capacity})"
 
         return str + f" [{self.type}]"
+
 
 class Session:
     def __init__(
@@ -52,6 +52,7 @@ class Session:
     def sort_criterion(self) -> str:
         return self.id
 
+
 class PresentationSession(Session):
     def __init__(
         self,
@@ -64,7 +65,7 @@ class PresentationSession(Session):
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, papers)
-        self._chairs = chairs if chairs is not None else []
+        self.chairs = chairs if chairs is not None else []
         self.room = room
 
         # For now, start/end can't be modified to avoid side effects!
@@ -81,7 +82,6 @@ class PresentationSession(Session):
 
     def sort_criterion(self) -> str:
         return "_".join([str(s) for s in (self.start, self._end, self.id, self.name)])
-
 
 class OralSession(PresentationSession):
     def __init__(
@@ -104,9 +104,42 @@ class OralSession(PresentationSession):
 
         if expected_duration > total_duration:
             raise Exception(
-                f"When adding the paper to session \"{self.id}\", the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes."
+                f'When adding the paper to session "{self.id}", the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes.'
             )
         super().add_paper(paper)
+
+    def start_presentation(self, paper: Paper | int) -> datetime.datetime:
+        if isinstance(paper, Paper):
+            paper_idx = self.papers.index(paper)
+            if paper_idx < 0:
+                raise IndexError(f"{paper} is not available in the current session")
+            paper = paper_idx
+
+        offset = paper * self._presentation_duration
+        return self.start + datetime.timedelta(minutes=offset)
+
+    def end_presentation(self, paper: Paper | int) -> datetime.datetime:
+        return self.start_presentation(paper) + datetime.timedelta(minutes=self._presentation_duration)
+
+    @property
+    def duration(self) -> int:
+        return self.duration
+
+
+class KeynoteSession(OralSession):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        room: Room | None = None,
+        papers: list[Paper] | None = None,
+        chairs: list[Person] | None = None,
+        presentation_duration: int = 60,
+    ):
+        super().__init__(id, name, start, end, room, papers, chairs, presentation_duration)
+
 
 class PosterSession(PresentationSession):
     def __init__(

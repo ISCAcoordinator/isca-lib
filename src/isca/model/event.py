@@ -1,6 +1,6 @@
 import datetime
 
-from .paper import Paper
+from .item import Paper
 from .person import Person
 from .session import Session, PresentationSession, Room
 

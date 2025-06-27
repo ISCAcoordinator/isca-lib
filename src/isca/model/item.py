@@ -138,3 +138,28 @@ class PublishedPaper(Paper):
         self.doi:  str | None  = doi
         self.author_area_id:  str | None  = author_area_id
         self.author_area_label:  str | None  = author_area_label
+
+class SurveyTalk:
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        abstract: str | None = None,
+        presenters: list[Person] | None = None,
+    ):
+        self._logger = logging.getLogger(self.__class__.__name__)
+        self._id = id
+        self.title: str = title
+        self.abstract = abstract
+        self.presenters: list[Person] = presenters if presenters is not None else []
+
+    @property
+    def id(self) -> str:
+        return self._id
+
+    def __str__(self):
+        talk_info = f"[{self.id}] {self.title}\n"
+        for presenter in self.presenters:
+            talk_info += f"  - {presenter}\n"
+
+        return talk_info
