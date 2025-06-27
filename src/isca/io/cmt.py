@@ -80,17 +80,38 @@ class CMTSerialiser:
             last_name = author_elts[-1]
             first_name = " ".join(author_elts[:-1])
             email = author_emails[i_author]
+
             # FIXME: As for now, we dunno how to extract the affiliation component, just consider an institute
             affiliation = Affiliation(match_author.group(2), None, None)
 
-            cur_person = Person(first_name, last_name, email=email, affiliations=set([affiliation]))
+            cur_person = Person(
+                first_name, last_name, email=email, affiliations=set([affiliation]), roles=set([Role.AUTHOR])
+            )
             paper_authors.append(cur_person)
+
+        # Extract presenters (TODO: This is a bit too specific, will have to check with Antoine about this)
+        presenters = None
+        if "Q7 (Presenter - Value)" in paper_info:
+            presenter_idx = paper_info["Q7 (Presenter - Value)"] - 1
+            if presenter_idx >= len(paper_authors):
+                raise IndexError(
+                    f"Author {presenter_idx} can't be a presenter as there are only {len(paper_authors)} authors"
+                )
+            cur_presenter = paper_authors[presenter_idx]
+            cur_presenter.add_role(Role.PRESENTER)
+            presenters = [cur_presenter]
+        else:
+            self._logger.debug(
+                f"[{paper_info['Paper ID']}] doesn't have a presenter",
+                extra={"paper_id": str(paper_info["Paper ID"]), "paper_serie": paper_info},
+            )
 
         return Paper(
             str(paper_info["Paper Title"]),
             paper_authors,
             abstract=str(paper_info["Abstract"]),
             id=str(paper_info["Paper ID"]),
+            presenters=presenters,
         )
 
     def load(self, conf_metadata_file: pathlib.Path) -> Conference:
@@ -344,7 +365,7 @@ class CMTSerialiser:
             # Create the sessions
             # TODO: Get time from the time slots, now this is just a place holder
             cur_time_slot = dict_timeslots[session_info["Timeslot name*"]]
-            cur_room = dict_room[session_info["Room name*"]] # FIXME: why this "*"?
+            cur_room = dict_room[session_info["Room name*"]]  # FIXME: why this "*"?
 
             session_type = str(session_info["Session type"])
             if session_type.lower() == "oral":
@@ -371,7 +392,9 @@ class CMTSerialiser:
                     continue
                 cur_session.add_paper(dict_papers[paper_id])
 
-            self._logger.debug(f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session})
+            self._logger.debug(
+                f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session}
+            )
             list_sessions.append(cur_session)
         return list_sessions
 
