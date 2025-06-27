@@ -3,6 +3,7 @@ from unidecode import unidecode
 import logging
 import pandas as pd
 
+
 class Affiliation:
     """An affiliation to be associated to a person
 
@@ -104,9 +105,10 @@ class Person:
         self,
         firstname: str | None,
         lastname: str,
+        main_affiliation: Affiliation,
         email: str | None = None,
         roles: set[Role] = set([Role.DEFAULT]),
-        affiliations: set[Affiliation] = set(),
+        alternative_affiliations: dict[Affiliation, set[str]] | None = None,
         middle_initial: str | None = None,
         id: str | None = None,
     ):
@@ -131,10 +133,13 @@ class Person:
         self._logger = logging.getLogger(self.__class__.__name__)
         self.firstname: str | None = firstname
         self.lastname: str = lastname
+        self.main_affiliation: Affiliation = main_affiliation
         self.middle_initial: str | None = middle_initial
         self._roles: set[Role] = roles
         self.email: str | None = email
-        self.affiliations: set[Affiliation] = affiliations
+        self.alternative_affiliations: dict[Affiliation, set[str]] = (
+            alternative_affiliations if alternative_affiliations is not None else dict()
+        )
 
         self._id: str = self._generate_id() if id is None else id
 
@@ -174,16 +179,6 @@ class Person:
             The string version of the User including its organisation
         """
         raise NotImplementedError("This method is not yet implemented")
-
-    def is_presenter(self) -> bool:
-        """Method to know if the current User is a presenter
-
-        Returns
-        -------
-        bool
-           True if the user is a presenter, False if not
-        """
-        return Role.PRESENTER in self._roles
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -259,7 +254,7 @@ class Person:
         return hash(self._id)
 
     def __repr__(self) -> str:
-        return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliations=[{self.affiliations}]), roles=({self._roles})"
+        return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.main_affiliation}]), roles=({self._roles})"
 
     def __str__(self) -> str:
         last_name = self.lastname
@@ -282,53 +277,35 @@ class Person:
 
         if self.id == other.id:
             return True
+        elif self.email == other.email:
+            return True
+
+        if (self.firstname != other.firstname):
+            return False
+        elif (self.lastname != other.lastname):
+            return False
+
+        # Check affiliations as it can be a bit tricky here
+        if self.main_affiliation in other.alternative_affiliations:
+            return True
+        elif self.main_affiliation in self.alternative_affiliations:
+            return True
+        elif set(self.alternative_affiliations.keys()).intersection(set(other.alternative_affiliations.keys())):
+            return True
+
         return False
 
-    def str_with_flatten_affiliations(self) -> str:
 
-        output = str(self)
+class Annuary:
+    def __init__(self):
+        self._annuary: set[Person] = set()
+        self._email_annuary: dict[str, Person] = dict()
 
-        aff_list = []
-        for cur_aff in self.affiliations:
-            aff_list.append(str(cur_aff))
+    def update(self, other: "Annuary"):
+        for person in other._annuary:
+            self._annuary.add(person)
 
-        output += " (" + "; ".join(aff_list) + ")"  # TODO: fix this
-        return output
-
-    def to_serie(self, with_flatten_affiliations=False) -> pd.Series:
-
-        current_serie = pd.Series(
-            {
-                "id": self.id,
-                "First Name": self.firstname,
-                "Middle Initial": self.middle_initial,
-                "Last Name": self.lastname,
-                "email": self.email,
-                "roles": ", ".join([str(r) in self._roles]),
-            }
-        )
-
-        if with_flatten_affiliations:
-            for i_aff, cur_aff in enumerate(self.affiliations):
-                aff_serie = cur_aff.to_serie()
-                for k, v in aff_serie.items():
-                    current_serie[f"{k}{i_aff}"] = v
-
-        return current_serie
-
-    @classmethod
-    def from_serie(
-        cls, serie: pd.Series
-    ) -> "Person":  # NOTE: typing return is a string until we move toward python 3.14
-
-        lastname = str(serie["lastname"])  # NOTE: this is the only mandatory field!
-        id = str(serie["id"]) if "id" in serie else None
-        firstname = str(serie["firstname"]) if "firstname" in serie else None
-        middle_initial = str(serie["middle_initial"]) if "middle_initial" in serie else None
-
-        email = str(serie["email"]) if "email" in serie else None
-        roles = set()
-
-        return Person(
-            id=id, firstname=firstname, middle_initial=middle_initial, lastname=lastname, email=email, roles=roles
-        )
+    def get_person(self, email: str) -> Person | None:
+        if email not in self._email_annuary:
+            return None
+        return self._email_annuary[email]

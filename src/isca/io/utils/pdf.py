@@ -88,7 +88,15 @@ def _get_authors(metadata: dict[str, str], affiliations: dict[str, Affiliation] 
                         cur_affiliation = affiliations[affiliation_indice.strip()]
                         list_affiliations.append(cur_affiliation)
 
-            cur_author = Person(first_name, last_name, email, affiliations=set(list_affiliations))
+            main_affiliation = list_affiliations[0]
+            alternative_affiliations = {}  # TODO: this needs to be fixed!
+            cur_author = Person(
+                first_name,
+                last_name,
+                main_affiliation=main_affiliation,
+                email=email,
+                alternative_affiliations=alternative_affiliations,
+            )
             list_authors.append(cur_author)
         else:
             raise PDFMetadataException(f'[Author] This should not have happened: "{cur_author}"')

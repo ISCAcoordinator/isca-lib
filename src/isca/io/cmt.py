@@ -85,7 +85,7 @@ class CMTSerialiser:
             affiliation = Affiliation(match_author.group(2), None, None)
 
             cur_person = Person(
-                first_name, last_name, email=email, affiliations=set([affiliation]), roles=set([Role.AUTHOR])
+                first_name, last_name, email=email, main_affiliation=affiliation, roles=set([Role.AUTHOR])
             )
             paper_authors.append(cur_person)
 
@@ -213,7 +213,7 @@ class CMTSerialiser:
                     last_name.strip(),
                     email=str(user_row["Email"]).strip(),
                     roles=roles,
-                    affiliations=set([affiliation]),
+                    main_affiliation=affiliation,
                     middle_initial=middle_initial,
                 )
 
@@ -473,8 +473,8 @@ class CMTSerialiser:
                 author_str += f"{{{author.lastname}}}"
 
                 # TODO: add affiliations
-                list_aff = []
-                for aff in author.affiliations:
+                list_aff = [str(author.main_affiliation)]
+                for aff, paper_id in author.alternative_affiliations.items():
                     list_aff.append(str(aff))
                 author_str += f"({CMT_AFFILIATION_SEPARATOR.join(list_aff)})"
 
