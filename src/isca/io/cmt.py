@@ -448,7 +448,6 @@ class CMTSerialiser:
             session_name = str(session_info["Session title"])
 
             # Create the sessions
-            # TODO: Get time from the time slots, now this is just a place holder
             cur_time_slot = dict_timeslots[session_info["Timeslot name*"]]
             cur_room = dict_room[session_info["Room name*"]]  # FIXME: why this "*"?
 
@@ -456,6 +455,8 @@ class CMTSerialiser:
             if session_type.lower() == "oral":
                 cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
             elif session_type.lower() == "poster":
+                cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            elif session_type.lower() == "show and tell":
                 cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
             else:
                 self._logger.error(
