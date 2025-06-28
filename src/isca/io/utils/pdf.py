@@ -18,8 +18,10 @@ PDF_AUTHOR_RE = r"([^{]*) \{([^}]+)\}(?: \{([0-9, ]+)\})?"
 class WordException(Exception):
     pass
 
+
 class PDFMetadataException(Exception):
     pass
+
 
 def _load_extended_metadata(doc: pymupdf.Document) -> dict[str, str]:
 
@@ -104,7 +106,7 @@ def _get_authors(metadata: dict[str, str], affiliations: dict[str, Affiliation] 
     return list_authors
 
 
-def load_pdf_information(paper_id: str, pdf_file: pathlib.Path, abstract: str) -> Paper:
+def load_pdf_information(pdf_file: pathlib.Path) -> tuple[str, list[Person]]:
     # Load the information
     doc = pymupdf.open(pdf_file)
     metadata = _load_extended_metadata(doc)
@@ -117,4 +119,4 @@ def load_pdf_information(paper_id: str, pdf_file: pathlib.Path, abstract: str) -
     authors = _get_authors(metadata, affiliations)
     title = metadata[PDF_TITLE_KEY].replace("\n", " ")
 
-    return Paper(title, authors, abstract, pdf_file, metadata_from_pdf=True, id=paper_id)
+    return title, authors

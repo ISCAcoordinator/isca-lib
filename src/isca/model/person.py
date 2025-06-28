@@ -280,9 +280,9 @@ class Person:
         elif self.email == other.email:
             return True
 
-        if (self.firstname != other.firstname):
+        if self.firstname != other.firstname:
             return False
-        elif (self.lastname != other.lastname):
+        elif self.lastname != other.lastname:
             return False
 
         # Check affiliations as it can be a bit tricky here
@@ -301,11 +301,49 @@ class Annuary:
         self._annuary: set[Person] = set()
         self._email_annuary: dict[str, Person] = dict()
 
+    def add(self, person: Person):
+        if (person.email is not None) and (self.find_person_by_email(person.email) is not None):
+            return
+
+        if person not in self._annuary:
+            self._annuary.add(person)
+
+        if person.email is not None:
+            self._email_annuary[person.email] = person
+
     def update(self, other: "Annuary"):
         for person in other._annuary:
             self._annuary.add(person)
 
-    def get_person(self, email: str) -> Person | None:
+    def find_person_by_email(self, email: str) -> Person | None:
         if email not in self._email_annuary:
             return None
         return self._email_annuary[email]
+
+    def find_person_by_id(self, id: str) -> Person | None:
+        raise NotImplementedError("This method is not yet implemented")
+
+    def find_person_by_name(self, firstname: str, lastname: str, middle_initial: str | None=None) -> set[Person]:
+        set_person = set()
+        for person in self._annuary:
+            if (person.firstname != firstname) or (person.lastname != lastname):
+                continue
+
+            if (middle_initial is not None) and (person.middle_initial != middle_initial):
+                continue
+
+            set_person.add(person)
+
+        return set_person
+
+    def __repr__(self) -> str:
+        output = ""
+        for person in self._annuary:
+            output += f"- {repr(person)}\n"
+        return output
+
+    def __str__(self) -> str:
+        output = ""
+        for person in self._annuary:
+            output += f"- {person}\n"
+        return output

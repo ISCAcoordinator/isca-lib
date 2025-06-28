@@ -1,11 +1,12 @@
 import datetime
 
+from .core import ISCAItem
 from .item import Paper
-from .person import Person
+from .person import Person, Annuary
 from .session import Session, PresentationSession, Room
 
 
-class Event:
+class Event(ISCAItem):
     def __init__(
         self,
         id: str,
@@ -15,7 +16,7 @@ class Event:
         location: str | None = None,
         url: str | None = None,
     ):
-        self._id: str = id
+        super().__init__(id)
         self.name: str = name
         self.start_date: datetime.date = start_date
         self.end_date: datetime.date = end_date
@@ -45,7 +46,7 @@ class Conference(Event):
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
         self._authors2papers: dict[Person, list[Paper]] = dict()
-        self._annuary: dict[str, Person] = dict()
+        self._annuary: Annuary = Annuary()
 
     def add_paper(self, paper: Paper, force_replace: bool = True):
         if (paper.id in self._papers) and (not force_replace):
@@ -71,8 +72,9 @@ class Conference(Event):
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
         # If the session is the presentation, need to adds the papers to the overall access
-        for paper in session.papers:
-            self.add_paper(paper, force_replace=False)
+        for presentation in session.presentations:
+            if presentation.presented_paper is not None:
+                self.add_paper(presentation.presented_paper, force_replace=False)
 
         self._sessions.append(session)
         self._sessions = sorted(self._sessions, key=lambda x: x.sort_criterion())  # Sort sessions by starting time
@@ -81,9 +83,9 @@ class Conference(Event):
         if session.id not in self._sessions:
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
-        if isinstance(session, PresentationSession):
-            for paper in session.papers:
-                self.add_paper(paper, force_replace=False)
+        for presentation in session.presentations:
+            if presentation.presented_paper is not None:
+                self.remove_paper(presentation.presented_paper.id)
 
         self._sessions.remove(session)
 
