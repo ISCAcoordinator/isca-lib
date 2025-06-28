@@ -12,7 +12,7 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Affiliation, Role, Annuary
-from ..model.item import Paper, OralPresentation, PosterPresentation
+from ..model.item import Paper, OralPresentation, PosterPresentation, SurveyTalk
 from ..model.session import Session, OralSession, PosterSession, Room
 from ..model.event import Conference
 
@@ -32,6 +32,7 @@ CMT_SESSION_TIMESLOTS_SHEET_NAME = "Timeslots"
 CMT_SESSION_SESSIONS_SHEET_NAME = "Sessions"
 CMT_SESSION_ROOMS_SHEET_NAME = "Rooms"
 CMT_SESSION_BLUESKY_SHEET_NAME = "BlueSky Papers"
+CMT_SESSION_SURVEY_TALKS_SHEET_NAME = "Survey Talks"
 CMT_SESSION_PAPER_SEPARATOR = ","
 
 CMT_CHAIR_CONF_SEPARATOR = ","
@@ -337,18 +338,65 @@ class CMTSerialiser:
 
         return dict_papers, annuary, dict_presenters
 
-    def _set_bluesky_papers(self, session_summary_file: pathlib.Path, dict_papers: dict[str, Paper]):
+    def _list_bluesky_paper_ids(self, session_summary_file: pathlib.Path) -> set[str]:
         df = pd.read_excel(
             session_summary_file,
             engine="openpyxl",
             sheet_name=CMT_SESSION_BLUESKY_SHEET_NAME,
-            header=None,
             names=["Paper ID"],
         )
+
+        bs_paper_ids = set()
         for _, bs_row in df.iterrows():
-            dict_papers[str(bs_row["Paper ID"])]
-        raise Exception(str(df))
-        pass
+            bs_paper_ids.add(str(bs_row["Paper ID"]))
+        return bs_paper_ids
+
+    def _load_survey_talks(self, session_summary_file: pathlib.Path, annuary: Annuary | None=None) -> dict[str, SurveyTalk]:
+        df = pd.read_excel(
+            session_summary_file,
+            engine="openpyxl",
+            sheet_name=CMT_SESSION_SURVEY_TALKS_SHEET_NAME,
+        )
+
+        survey_talks = dict()
+        for _, survey_talk in df.iterrows():
+
+            presenter = None
+            if (annuary is not None):
+                presenter = annuary.find_person_by_email(survey_talk["Email"])
+
+            if presenter is None:
+                first_name = str(survey_talk["First Name"]).strip()
+
+                middle_initial = ""
+                if ('Middle Initial (optional)' in survey_talk) and (not pd.isna(survey_talk["Middle Initial (optional)"])):
+                    middle_initial = str(survey_talk["Middle Initial (optional)"]).strip()
+
+                if pd.isna(survey_talk["Last Name"]) or (str(survey_talk["Last Name"]) == ""):
+                    last_name = first_name.strip()
+                    first_name = ""
+                else:
+                    last_name = str(survey_talk["Last Name"])
+
+                affiliation = Affiliation(
+                    institute=str(survey_talk["Organization"]).strip(),
+                    country=str(survey_talk["Country"]).strip(),
+                )
+
+                roles = set([Role.PRESENTER])
+                presenter = Person(
+                    first_name.strip(),
+                    last_name.strip(),
+                    email=str(survey_talk["Email"]).strip(),
+                    roles=roles,
+                    main_affiliation=affiliation,
+                    middle_initial=middle_initial,
+                )
+            presenters = [presenter]
+
+            survey = SurveyTalk(survey_talk["Survey ID"], title=survey_talk["Paper Title"], presenters=list(presenters), duration=40, abstract=survey_talk["Abstract"])
+            survey_talks[survey_talk['Survey ID']] = survey
+        return survey_talks
 
     def load_sessions(
         self,
@@ -384,9 +432,10 @@ class CMTSerialiser:
             dict_timeslots[timeslot_info["Timeslot name"]] = [start_time, end_time]
 
         # TODO: prepare the surveys!
+        survey_talks = self._load_survey_talks(session_summary_file)
 
         # TODO: Set the list of blue sky papers
-        # self._set_bluesky_papers(session_summary_file, dict_papers)
+        bs_paper_ids = self._list_bluesky_paper_ids(session_summary_file)
 
         # Create the sessions
         list_sessions = []
@@ -420,37 +469,41 @@ class CMTSerialiser:
                 str(id).strip() for id in str(session_info["Papers"]).split(CMT_SESSION_PAPER_SEPARATOR)
             ]
             for paper_idx, paper_id in enumerate(session_paper_ids, 1):
-                if paper_id not in dict_papers:
+                if paper_id in dict_papers:
+
+                    cur_paper = dict_papers[paper_id]
+                    paper_presenters = None
+                    if (dict_presenters is not None) and (paper_id in dict_presenters):
+                        paper_presenters = dict_presenters[paper_id]
+
+                    if isinstance(cur_session, OralSession):
+                        cur_presentation = OralPresentation(
+                            f"{session_id}_{paper_idx}",
+                            cur_paper.title,
+                            paper_presenters,
+                            cur_session.default_duration if paper_id not in bs_paper_ids else 40, # TODO: the duration is hardcoded
+                            cur_paper.abstract,
+                            cur_paper,
+                        )
+                    elif isinstance(cur_session, PosterSession):
+                        cur_presentation = PosterPresentation(
+                            f"{session_id}_{paper_idx}",
+                            cur_paper.title,
+                            paper_presenters,
+                            cur_paper.abstract,
+                            cur_paper,
+                        )
+                    else:
+                        raise Exception(f"Should not have happnened, {type(cur_session)} is not known")
+                elif paper_id in survey_talks:
+                    cur_presentation = survey_talks[paper_id]
+                else:
                     self._logger.error(
                         f"[{session_id}] {paper_id} is not an available papers, so ignored",
                         extra={"session_id": session_id, "session_name": session_name},
                     )
                     continue
 
-                cur_paper = dict_papers[paper_id]
-                paper_presenters = None
-                if (dict_presenters is not None) and (paper_id in dict_presenters):
-                    paper_presenters = dict_presenters[paper_id]
-
-                if isinstance(cur_session, OralSession):
-                    cur_presentation = OralPresentation(
-                        f"{session_id}_{paper_idx}",
-                        cur_paper.title,
-                        paper_presenters,
-                        cur_session.default_duration,
-                        cur_paper.abstract,
-                        cur_paper,
-                    )
-                elif isinstance(cur_session, PosterSession):
-                    cur_presentation = PosterPresentation(
-                        f"{session_id}_{paper_idx}",
-                        cur_paper.title,
-                        paper_presenters,
-                        cur_paper.abstract,
-                        cur_paper,
-                    )
-                else:
-                    raise Exception(f"Should not have happnened, {type(cur_session)} is not known")
                 cur_session.add_presentation(cur_presentation)
 
             self._logger.debug(
