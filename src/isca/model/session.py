@@ -2,7 +2,7 @@ import datetime
 
 from .core import ISCAItem
 from .person import Person
-from .item import Paper, Presentation
+from .item import Presentation, PosterPresentation, OralPresentation
 
 
 class Room(ISCAItem):
@@ -85,6 +85,7 @@ class PresentationSession(Session):
     def sort_criterion(self) -> str:
         return "_".join([str(s) for s in (self.start, self._end, self.id, self.name)])
 
+
 class OralSession(PresentationSession):
     def __init__(
         self,
@@ -101,8 +102,16 @@ class OralSession(PresentationSession):
         self._default_presentation_duration = default_presentation_duration
 
     def add_presentation(self, presentation: Presentation):
-        expected_duration = self._default_presentation_duration * (len(self.presentations) + 1)
+        if not isinstance(presentation, OralPresentation):
+            raise Exception("The presentation should be an Oral Presentation")
+
         total_duration = (self.end - self.start).seconds / 60
+        expected_duration = 0
+        for cur_presentation in self.presentations:
+            expected_duration += cur_presentation.duration
+        expected_duration += presentation.duration
+
+        expected_duration = self._default_presentation_duration * (len(self.presentations) + 1)
 
         if expected_duration > total_duration:
             raise Exception(
@@ -111,17 +120,35 @@ class OralSession(PresentationSession):
         super().add_presentation(presentation)
 
     def start_presentation(self, presentation: Presentation | int) -> datetime.datetime:
-        if isinstance(presentation, Presentation):
-            presentation_idx = self.presentations.index(presentation)
-            if presentation_idx < 0:
-                raise IndexError(f"{presentation} is not available in the current session")
-            presentation = presentation_idx
+        start = self.start
 
-        offset = presentation * self._default_presentation_duration
-        return self.start + datetime.timedelta(minutes=offset)
+        if isinstance(presentation, int):
+            assert presentation < len(
+                self.presentations
+            ), f"There are not enough presentation in the session ({len(self.presentations)} < {presentation})"
+
+            for pres_idx, cur_presentation in enumerate(self.presentations):
+                if pres_idx >= presentation:
+                    break
+
+
+                start += datetime.timedelta(minutes=cur_presentation.duration)
+        elif isinstance(presentation, Presentation):
+            for cur_presentation in self.presentations:
+                if presentation == cur_presentation:
+                    break
+
+                start += datetime.timedelta(minutes=cur_presentation.duration)
+
+
+        return start
 
     def end_presentation(self, presentation: Presentation | int) -> datetime.datetime:
-        return self.start_presentation(presentation) + datetime.timedelta(minutes=self._default_presentation_duration)
+        if isinstance(presentation, int):
+            presentation = self.presentations[presentation]
+
+
+        return self.start_presentation(presentation) + datetime.timedelta(minutes=presentation.duration)
 
     @property
     def default_duration(self) -> int:

@@ -148,13 +148,18 @@ class Presentation(ISCAItem):
         self._presented_paper: Paper | None = presented_paper
 
     @property
+    def duration(self) -> int | None:
+        return self._duration
+
+    @property
     def presented_paper(self) -> Paper | None:
         return self._presented_paper
 
     def __str__(self):
         talk_info = f"[{self.id}] {self.title}\n"
-        for presenter in self.presenters:
-            talk_info += f"  - {presenter}\n"
+        if self.presenters is not None:
+            for presenter in self.presenters:
+                talk_info += f"  - {presenter}\n"
 
         return talk_info
 
@@ -170,6 +175,11 @@ class OralPresentation(Presentation):
         presented_paper: Paper | None = None,
     ):
         super().__init__(id, title, presenters, duration, abstract, presented_paper)
+
+    @property
+    def duration(self) -> int:
+        assert self._duration is not None
+        return self._duration
 
 
 class PosterPresentation(Presentation):
