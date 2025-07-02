@@ -1,3 +1,4 @@
+from typing import Iterator
 from enum import Enum
 from unidecode import unidecode
 import logging
@@ -41,7 +42,11 @@ class Affiliation:
         list_elts.append(self.institute)
         if self.country is not None:
             list_elts.append("{" + self.country + "}")
+
         return ", ".join(list_elts)
+
+    def short_str(self) -> str:
+        return self.institute
 
     def to_serie(self) -> pd.Series:
         return pd.Series({"departement": self.department, "institute": self.institute, "country": self.country})
@@ -99,6 +104,7 @@ class Person:
         The identifier of the person [private attribute, should not be accessed directly, please use self.id instead]
     """
 
+    _counter: int = 0
     ROLE_SEP: str = ";"
 
     def __init__(
@@ -237,7 +243,23 @@ class Person:
         return s
 
     def _generate_id(self) -> str:
-        return f"{self.firstname} {self.lastname} ({self.email})"
+        Person._counter += 1
+        return str(Person._counter)
+
+    def str_with_flatten_affiliations(self, paper_id: str) -> str:
+        str_person = str(self)
+        affiliations = [str(self.main_affiliation)]
+        for affiliation, papers in self.alternative_affiliations.items():
+            if paper_id in papers:
+                affiliations.append(str(affiliation))
+        str_person += f"({'; '.join(affiliations)})"
+
+        return str_person
+
+    def add_alternative_affiliation(self, affiliation: Affiliation, paper_id: str):
+        if affiliation not in self.alternative_affiliations:
+            self.alternative_affiliations[affiliation] = set()
+        self.alternative_affiliations[affiliation].add(paper_id)
 
     @property
     def id(self) -> str:
@@ -304,7 +326,6 @@ class Annuary:
     def add(self, person: Person):
         if (person.email is not None) and (self.find_person_by_email(person.email) is not None):
             return
-
         if person not in self._annuary:
             self._annuary.add(person)
 
@@ -347,3 +368,6 @@ class Annuary:
         for person in self._annuary:
             output += f"- {person}\n"
         return output
+
+    def __iter__(self) -> Iterator[Person]:
+        return iter(self._annuary)
