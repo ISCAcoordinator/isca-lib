@@ -15,6 +15,7 @@ class Event(ISCAItem):
         end_date: datetime.date,
         location: str | None = None,
         url: str | None = None,
+        theme: dict[str, object] | None = None
     ):
         super().__init__(id)
         self.name: str = name
@@ -22,6 +23,7 @@ class Event(ISCAItem):
         self.end_date: datetime.date = end_date
         self.location: str | None = location
         self.url: str | None = url
+        self.theme: dict[str, object] | None = theme
 
 
 class Conference(Event):
@@ -37,8 +39,9 @@ class Conference(Event):
         chairs: list[Person] | None = None,
         issn: str | None = None,
         generate_doi: bool = False,
+        theme: dict[str, object] | None = None
     ):
-        super().__init__(id, name, start_date, end_date, location, url)
+        super().__init__(id, name, start_date, end_date, location, url, theme)
         self.serie: str | None = serie
         self.issn: str | None = issn
         self.generate_doi: bool = generate_doi
