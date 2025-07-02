@@ -203,3 +203,25 @@ class SurveyTalk(OralPresentation):
         abstract: str | None = None,
     ):
         super().__init__(id, title, presenters, duration, abstract, None)
+
+class SpecialPresentation(Presentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, None, abstract, presented_paper)
+
+class ShowAndTellPresentation(Presentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, None, abstract, presented_paper)

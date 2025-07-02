@@ -6,8 +6,8 @@ from .item import Presentation, PosterPresentation, OralPresentation
 
 
 class Room(ISCAItem):
-    def __init__(self, name: str, type: str, capacity: int | tuple[int] | list[int] | None):
-        super().__init__(name)
+    def __init__(self, id: str, name: str, type: str, capacity: int | tuple[int] | list[int] | None):
+        super().__init__(id)
         self.name: str = name
         self.type: str = type
         self.capacity: int | tuple[int] | list[int] | None = capacity
@@ -171,6 +171,32 @@ class KeynoteSession(OralSession):
 
 
 class PosterSession(PresentationSession):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        room: Room | None = None,
+        presentations: list[Presentation] | None = None,
+        chairs: list[Person] | None = None,
+    ):
+        super().__init__(id, name, start, end, room, presentations, chairs)
+
+class SpecialSession(PresentationSession):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        room: Room | None = None,
+        presentations: list[Presentation] | None = None,
+        chairs: list[Person] | None = None,
+    ):
+        super().__init__(id, name, start, end, room, presentations, chairs)
+
+class ShowAndTellSession(PresentationSession):
     def __init__(
         self,
         id: str,
