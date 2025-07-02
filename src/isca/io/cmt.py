@@ -12,13 +12,13 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Affiliation, Role, Annuary
-from ..model.item import Paper, OralPresentation, PosterPresentation, SurveyTalk
-from ..model.session import Session, OralSession, PosterSession, Room
+from ..model.item import Paper, OralPresentation, PosterPresentation, SurveyTalk, SpecialPresentation, ShowAndTellPresentation
+from ..model.session import Session, OralSession, PosterSession, SpecialSession, ShowAndTellSession, Room
 from ..model.event import Conference
 
 # IO Utils
 from .utils.pdf import load_pdf_information, WordException, PDFMetadataException
-
+from .utils.helpers import load_excel
 
 ###############################################################################
 # Constants
@@ -38,9 +38,29 @@ CMT_SESSION_PAPER_SEPARATOR = ","
 CMT_CHAIR_CONF_SEPARATOR = ","
 
 CMT_ROLE_SEP = ";"
-CMT_AFFILIATION_SEPARATOR = "; "
+CMT_AFFILIATION_SEPARATOR = ";"
 
-CMT_AUTHOR_REGEXP = re.compile(r"^([^(]*) \((.*)\)")
+CMT_AUTHOR_FULL_INFO_REGEXP = re.compile(r"^([^(]*)[ ]*\((.*)\)")
+CMT_AUTHOR_ELTS_REGEXP = re.compile(
+    r"""
+    ^\s*
+    (?:([^{}]+)\s+)?
+    (?:\[([^{}]+)\]\s+)?
+    \{(.+)\}
+    \s*$
+""",
+    re.VERBOSE,
+)
+CMT_AFFILIATION_REGEXP = re.compile(
+    r"""
+    ^\s*
+    (?:\{([^{}]+)\},\s*)?      # Optional part 1 inside {}
+    ([^{}]+?)                  # Required part 2 (no braces)
+    (?:,\s*\{([^{}]+)\})?      # Optional part 3 inside {}
+    \s*$
+""",
+    re.VERBOSE,
+)
 
 
 ###############################################################################
@@ -51,13 +71,22 @@ class CMTSerialiser:
         self._logger = logging.getLogger(self.__class__.__name__)
         self.metadata_from_pdf = metadata_from_pdf
         self.ignore_sessions = ignore_sessions
+        self._annuary = Annuary()
 
-    def _extract_df_information(self, paper_info: pd.Series, annuary: Annuary | None=None) -> tuple[Paper, list[Person] | None]:
-        author_names = str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
+    def _extract_df_information(
+        self, paper_info: pd.Series
+    ) -> tuple[Paper, list[Person] | None]:
+
+        author_names = (
+            str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
+        )
         author_emails = str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)
 
         # The number of elements should be the same
         if len(author_emails) != len(author_names):
+            names = "\n".join(author_names)
+            self._logger.error(f"[{paper_info['Paper ID']}] author names = {names}")
+            self._logger.error(f"[{paper_info['Paper ID']}] author emails = {author_emails}")
             raise Exception(
                 f"[{paper_info['Paper ID']}] The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
             )
@@ -68,35 +97,87 @@ class CMTSerialiser:
             if cur_author[-1] != ")":
                 cur_author = cur_author + ")"
 
-            match_author = CMT_AUTHOR_REGEXP.match(cur_author)
-            if not match_author:
+            match_author_affiliations = CMT_AUTHOR_FULL_INFO_REGEXP.match(cur_author)
+            if not match_author_affiliations:
                 raise Exception(
-                    f"Impossible to parse the author, please fix the spreadsheet: {cur_author}"
+                    f"[{paper_info['Paper ID']}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
                 )
 
             # Extract author information
-            cur_author = match_author.group(1)
-            author_elts = cur_author.split(" ")
-            author_elts = list(
-                filter(None, author_elts)
-            )  # NOTE: helpers to ignore empty elements due to multiple space
-            last_name = author_elts[-1]
-            first_name = " ".join(author_elts[:-1])
+            middle_initial = None
             email = author_emails[i_author]
+            cur_author = match_author_affiliations.group(1)
+            if "{" in cur_author:
+                match_author = CMT_AUTHOR_ELTS_REGEXP.match(cur_author)
+                if match_author:
+                    first_name = match_author.group(1)
+                    middle_initial = match_author.group(2)
+                    last_name = match_author.group(3)
+                else:
+                    raise Exception(
+                        f"[{paper_info['Paper ID']}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
+                    )
+            else:
+                author_elts = cur_author.split(" ")
+                author_elts = list(
+                    filter(None, author_elts)
+                )  # NOTE: helpers to ignore empty elements due to multiple space
+                last_name = author_elts[-1]
+                first_name = " ".join(author_elts[:-1])
 
             # FIXME: As for now, we dunno how to extract the affiliation component, just consider an institute
-            affiliation = Affiliation(match_author.group(2), None, None)
+            list_affiliations = []
+            affiliations = [s.strip() for s in match_author_affiliations.group(2).split(CMT_AFFILIATION_SEPARATOR)]
+            for f in affiliations:
+                match_affiliation = CMT_AFFILIATION_REGEXP.match(f)
+                if not match_affiliation:
+                    raise Exception(
+                        f"[{paper_info['Paper ID']}] The following affiliation for author {cur_author} is not valid: {f}"
+                    )
 
-            cur_person = None
-            if annuary is not None:
-                cur_person = annuary.find_person_by_email(email)
-                if cur_person is not None:
-                    cur_person.add_role(Role.AUTHOR)
+                country = None
+                if len(match_affiliation.groups()) > 2:
+                    country = match_affiliation.group(3)
+
+                affiliation = Affiliation(
+                    department=match_affiliation.group(1), institute=match_affiliation.group(2), country=country
+                )
+                list_affiliations.append(affiliation)
+            assert len(list_affiliations) > 0
+
+            cur_person = self._annuary.find_person_by_email(email)
+
+            # # TODO: this is too naive for now, no possibility
+            # if cur_person is None:
+            #     candidates = self._annuary.find_person_by_name(first_name, last_name, middle_initial)
+            #     if len(candidates) > 0:
+            #         if len(candidates) > 1:
+            #             raise Exception(f"[{paper_info['Paper ID']}] Too many candidates for {first_name} {'[' + middle_initial + ']' if middle_initial is not None else ''} {last_name}")
+            #         cur_person = list(candidates)[0]
 
             if cur_person is None:
+                alternative_affiliations = None
+                if len(list_affiliations) > 1:
+                    alternative_affiliations = dict()
+                    for affiliation in list_affiliations:
+                        alternative_affiliations[affiliation] = set([str(paper_info["Paper ID"])])
+
                 cur_person = Person(
-                    first_name, last_name, email=email, main_affiliation=affiliation, roles=set([Role.AUTHOR])
+                    first_name,
+                    last_name,
+                    email=email,
+                    main_affiliation=list_affiliations[0],
+                    alternative_affiliations=alternative_affiliations,
+                    roles=set([Role.AUTHOR]),
                 )
+            else:
+                cur_person.add_role(Role.AUTHOR)
+                cur_person.firstname = first_name
+                cur_person.lastname = last_name
+                alternative_affiliations = dict()
+                for affiliation in list_affiliations:
+                    cur_person.add_alternative_affiliation(affiliation, str(paper_info["Paper ID"]))
+            self._annuary.add(cur_person)
             paper_authors.append(cur_person)
 
         # Extract presenters (TODO: This is a bit too specific, will have to check with Antoine about this)
@@ -116,12 +197,19 @@ class CMTSerialiser:
                 extra={"paper_id": str(paper_info["Paper ID"]), "paper_serie": paper_info},
             )
 
+        abstract = None
+        if "Abstract" in paper_info:
+            abstract = str(paper_info["Abstract"])
+        elif "Paper Abstract" in paper_info:
+            abstract = str(paper_info["Paper Abstract"])
+        abstract = re.sub(r'(?<!\n)\n(?=\S)', ' ', abstract) # NOTE: merge consecutive lines
+
         return (
             Paper(
                 str(paper_info["Paper ID"]),
                 str(paper_info["Paper Title"]),
                 paper_authors,
-                abstract=str(paper_info["Abstract"]),
+                abstract=abstract,
             ),
             presenters,
         )
@@ -156,25 +244,28 @@ class CMTSerialiser:
         else:
             user_file = input_root_dir / conf_info["input_data"]["users_spreadsheet"]
 
-        if conf_info["input_data"]["sessions_spreadsheet"].startswith("/"):
+        if "sessions_spreadsheet" not in conf_info["input_data"]:
+            self.ignore_sessions = True
+            self._logger.warning("There is no session spreadsheet indicated, we just ignore any session information")
+        elif conf_info["input_data"]["sessions_spreadsheet"].startswith("/"):
             session_file = pathlib.Path(conf_info["input_data"]["sessions_spreadsheet"])
         else:
             session_file = input_root_dir / conf_info["input_data"]["sessions_spreadsheet"]
 
         annuary = self.load_users(user_file)
-        papers, annuary, presenters = self.load_papers(metadata_file, pdfs_path, updated_pdfs_path, annuary)
+        papers, annuary, presenters = self.load_papers(metadata_file, pdfs_path, updated_pdfs_path)
 
         if self.ignore_sessions:
-            return self.load_conference(conf_metadata_file, papers=papers, annuary=annuary)
+            return self.load_conference(conf_metadata_file, papers=papers)
         else:
             sessions = self.load_sessions(session_file, papers, presenters)
-            return self.load_conference(conf_metadata_file, sessions=sessions, annuary=annuary)
+            return self.load_conference(conf_metadata_file, sessions=sessions)
 
-    def load_users(self, user_spreadsheet_file: pathlib.Path, ignore_role: bool=True) -> Annuary:
+    def load_users(self, user_spreadsheet_file: pathlib.Path, ignore_role: bool = True) -> Annuary:
         users = Annuary()
         wb = load_workbook(filename=user_spreadsheet_file)
         for worksheet in wb.sheetnames:
-            df = pd.read_excel(user_spreadsheet_file, engine="openpyxl", sheet_name=worksheet)
+            df = load_excel(user_spreadsheet_file, sheet_name=worksheet)
 
             for _, user_row in df.iterrows():
                 first_name = str(user_row["# First Name"]).strip()
@@ -232,6 +323,7 @@ class CMTSerialiser:
 
                 users.add(cur_user)
 
+        self._annuary = users
         return users
 
     def load_papers(
@@ -239,17 +331,14 @@ class CMTSerialiser:
         submission_summary_file: pathlib.Path,
         paper_root_dir: pathlib.Path | None = None,
         updated_paper_root_dir: pathlib.Path | None = None,
-        annuary: Annuary | None = None,
     ) -> tuple[dict[str, Paper], Annuary, dict[str, list[Person]]]:
-        if annuary is None:
-            annuary = Annuary()
 
         dict_papers = dict()
         dict_presenters = dict()
 
         wb = load_workbook(filename=submission_summary_file)
         for worksheet in wb.sheetnames:
-            df = pd.read_excel(submission_summary_file, engine="openpyxl", sheet_name=worksheet)
+            df = load_excel(submission_summary_file, sheet_name=worksheet)
             total_papers = df.shape[0]
             failed_papers = 0
             word_papers = 0
@@ -326,7 +415,7 @@ class CMTSerialiser:
 
                 dict_papers[cur_paper.id] = cur_paper
                 for cur_author in cur_paper.authors:
-                    annuary.add(cur_author)
+                    self._annuary.add(cur_author)
                 dict_presenters[cur_paper.id] = presenters
 
             self._logger.info(
@@ -336,12 +425,11 @@ class CMTSerialiser:
                 + f"nopdf ={no_pdf} ({no_pdf/total_papers*100:.2f}%)"
             )
 
-        return dict_papers, annuary, dict_presenters
+        return dict_papers, self._annuary, dict_presenters
 
     def _list_bluesky_paper_ids(self, session_summary_file: pathlib.Path) -> set[str]:
-        df = pd.read_excel(
+        df = load_excel(
             session_summary_file,
-            engine="openpyxl",
             sheet_name=CMT_SESSION_BLUESKY_SHEET_NAME,
             names=["Paper ID"],
         )
@@ -351,25 +439,26 @@ class CMTSerialiser:
             bs_paper_ids.add(str(bs_row["Paper ID"]))
         return bs_paper_ids
 
-    def _load_survey_talks(self, session_summary_file: pathlib.Path, annuary: Annuary | None=None) -> dict[str, SurveyTalk]:
-        df = pd.read_excel(
+    def _load_survey_talks(
+        self, session_summary_file: pathlib.Path
+    ) -> dict[str, SurveyTalk]:
+        df = load_excel(
             session_summary_file,
-            engine="openpyxl",
             sheet_name=CMT_SESSION_SURVEY_TALKS_SHEET_NAME,
         )
 
         survey_talks = dict()
         for _, survey_talk in df.iterrows():
 
-            presenter = None
-            if (annuary is not None):
-                presenter = annuary.find_person_by_email(survey_talk["Email"])
+            presenter = self._annuary.find_person_by_email(survey_talk["Email"])
 
             if presenter is None:
                 first_name = str(survey_talk["First Name"]).strip()
 
                 middle_initial = ""
-                if ('Middle Initial (optional)' in survey_talk) and (not pd.isna(survey_talk["Middle Initial (optional)"])):
+                if ("Middle Initial (optional)" in survey_talk) and (
+                    not pd.isna(survey_talk["Middle Initial (optional)"])
+                ):
                     middle_initial = str(survey_talk["Middle Initial (optional)"]).strip()
 
                 if pd.isna(survey_talk["Last Name"]) or (str(survey_talk["Last Name"]) == ""):
@@ -394,8 +483,14 @@ class CMTSerialiser:
                 )
             presenters = [presenter]
 
-            survey = SurveyTalk(survey_talk["Survey ID"], title=survey_talk["Paper Title"], presenters=list(presenters), duration=40, abstract=survey_talk["Abstract"])
-            survey_talks[survey_talk['Survey ID']] = survey
+            survey = SurveyTalk(
+                survey_talk["Survey ID"],
+                title=survey_talk["Paper Title"],
+                presenters=list(presenters),
+                duration=40,
+                abstract=survey_talk["Abstract"],
+            )
+            survey_talks[survey_talk["Survey ID"]] = survey
         return survey_talks
 
     def load_sessions(
@@ -407,7 +502,7 @@ class CMTSerialiser:
 
         # Load rooms
         dict_room = dict()
-        df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_ROOMS_SHEET_NAME)
+        df = load_excel(session_summary_file, sheet_name=CMT_SESSION_ROOMS_SHEET_NAME)
         for _, room_info in df.iterrows():
             capacity = str(room_info["Capacity"]).strip()
             if (capacity == "") or (capacity == "nan"):
@@ -417,12 +512,17 @@ class CMTSerialiser:
             else:
                 capacity = int(capacity)
 
-            room = Room(str(room_info["Room name"]), str(room_info["Room type"]), capacity)
+            room = Room(
+                str(room_info["Room name"]).replace(" ", "_"),
+                str(room_info["Room name"]),
+                str(room_info["Room type"]),
+                capacity,
+            )
             dict_room[room.name] = room
 
         # Now load timeslots
         dict_timeslots = dict()
-        df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_TIMESLOTS_SHEET_NAME)
+        df = load_excel(session_summary_file, sheet_name=CMT_SESSION_TIMESLOTS_SHEET_NAME)
         df["Date"] = df["Date"].astype(str)
         for _, timeslot_info in df.iterrows():
             start_time = f"{timeslot_info['Date']} {timeslot_info['Start']}"
@@ -439,7 +539,7 @@ class CMTSerialiser:
 
         # Create the sessions
         list_sessions = []
-        df = pd.read_excel(session_summary_file, engine="openpyxl", sheet_name=CMT_SESSION_SESSIONS_SHEET_NAME)
+        df = load_excel(session_summary_file, sheet_name=CMT_SESSION_SESSIONS_SHEET_NAME)
         for _, session_info in df.iterrows():
             if pd.isna(session_info["Session name"]):
                 continue
@@ -457,7 +557,9 @@ class CMTSerialiser:
             elif session_type.lower() == "poster":
                 cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
             elif session_type.lower() == "show and tell":
-                cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                cur_session = ShowAndTellSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+            elif session_type.lower() == "special":
+                cur_session = SpecialSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
             else:
                 self._logger.error(
                     f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
@@ -482,12 +584,30 @@ class CMTSerialiser:
                             f"{session_id}_{paper_idx}",
                             cur_paper.title,
                             paper_presenters,
-                            cur_session.default_duration if paper_id not in bs_paper_ids else 40, # TODO: the duration is hardcoded
+                            (
+                                cur_session.default_duration if paper_id not in bs_paper_ids else 40
+                            ),  # TODO: the duration is hardcoded
                             cur_paper.abstract,
                             cur_paper,
                         )
                     elif isinstance(cur_session, PosterSession):
                         cur_presentation = PosterPresentation(
+                            f"{session_id}_{paper_idx}",
+                            cur_paper.title,
+                            paper_presenters,
+                            cur_paper.abstract,
+                            cur_paper,
+                        )
+                    elif isinstance(cur_session, ShowAndTellSession):
+                        cur_presentation = ShowAndTellPresentation(
+                            f"{session_id}_{paper_idx}",
+                            cur_paper.title,
+                            paper_presenters,
+                            cur_paper.abstract,
+                            cur_paper,
+                        )
+                    elif isinstance(cur_session, SpecialSession):
+                        cur_presentation = SpecialPresentation(
                             f"{session_id}_{paper_idx}",
                             cur_paper.title,
                             paper_presenters,
@@ -519,16 +639,12 @@ class CMTSerialiser:
         conference_info_file: pathlib.Path,
         sessions: list[Session] | None = None,
         papers: dict[str, Paper] | None = None,
-        annuary: Annuary | None = None,
     ) -> Conference:
 
         if (sessions is not None) and (papers is not None):
             raise Exception(
                 "Either the sessions OR the papers should be given. The papers will be loaded from the sessions. In case no sessions, the provide the papers."
             )
-
-        if annuary is None:
-            annuary = Annuary()
 
         conf_info = dict()
         yaml = YAML(typ="rt", pure=True)
@@ -566,6 +682,7 @@ class CMTSerialiser:
             chairs,
             conf_info["ISSN"] if "ISSN" in conf_info else None,
             conf_info["generateDOIs"] if "generateDOIs" in conf_info else False,
+            conf_info["theme"] if "theme" in conf_info else None
         )
         if sessions is not None:
             for session in sessions:
