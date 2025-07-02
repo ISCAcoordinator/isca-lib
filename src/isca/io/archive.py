@@ -12,7 +12,7 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Role
-from ..model.paper import Paper, PublishedPaper
+from ..model.item import Paper, PublishedPaper
 from ..model.session import Session
 from ..model.event import Conference
 
