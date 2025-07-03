@@ -246,13 +246,21 @@ class Person:
         Person._counter += 1
         return str(Person._counter)
 
-    def str_with_flatten_affiliations(self, paper_id: str) -> str:
+    def str_with_flatten_affiliations(self, paper_id: str, short=False) -> str:
         str_person = str(self)
-        affiliations = [str(self.main_affiliation)]
+        affiliations = []
+        if short:
+            affiliations.append(self.main_affiliation.institute)
+        else:
+            affiliations.append(str(self.main_affiliation))
         for affiliation, papers in self.alternative_affiliations.items():
             if paper_id in papers:
-                affiliations.append(str(affiliation))
-        str_person += f"({'; '.join(affiliations)})"
+                if short:
+                    affiliation = affiliation.institute
+                else:
+                    affiliation = str(affiliation)
+                affiliations.append(affiliation)
+        str_person += f" ({'; '.join(affiliations)})"
 
         return str_person
 
