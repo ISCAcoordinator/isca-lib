@@ -12,7 +12,7 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Affiliation, Role, Annuary
-from ..model.item import Paper, OralPresentation, PosterPresentation, SurveyTalk, SpecialPresentation, ShowAndTellPresentation
+from ..model.item import BlueSkyPresentation, Paper, OralPresentation, PosterPresentation, SurveyTalk, SpecialPresentation, ShowAndTellPresentation
 from ..model.session import Session, OralSession, PosterSession, SpecialSession, ShowAndTellSession, Room
 from ..model.event import Conference
 
@@ -204,10 +204,16 @@ class CMTSerialiser:
             abstract = str(paper_info["Paper Abstract"])
         abstract = re.sub(r'(?<!\n)\n(?=\S)', ' ', abstract) # NOTE: merge consecutive lines
 
+        # Fix title
+        title = str(paper_info["Paper Title"])
+        if ("\n" in title) or ("\r" in title):
+            title = title.replace("\r", "")
+            title = " ".join([t.strip() for t in title.split("\n")])
+
         return (
             Paper(
                 str(paper_info["Paper ID"]),
-                str(paper_info["Paper Title"]),
+                title,
                 paper_authors,
                 abstract=abstract,
             ),
@@ -240,9 +246,14 @@ class CMTSerialiser:
             metadata_file = input_root_dir / conf_info["input_data"]["metadata_spreadsheet"]
 
         if conf_info["input_data"]["users_spreadsheet"].startswith("/"):
-            user_file = pathlib.Path(conf_info["input_data"]["users_spreadsheet"])
+            users_file = pathlib.Path(conf_info["input_data"]["users_spreadsheet"])
         else:
-            user_file = input_root_dir / conf_info["input_data"]["users_spreadsheet"]
+            users_file = input_root_dir / conf_info["input_data"]["users_spreadsheet"]
+
+        if conf_info["input_data"]["reviewers_spreadsheet"].startswith("/"):
+            reviewers_file = pathlib.Path(conf_info["input_data"]["reviewers_spreadsheet"])
+        else:
+            reviewers_file = input_root_dir / conf_info["input_data"]["reviewers_spreadsheet"]
 
         if "sessions_spreadsheet" not in conf_info["input_data"]:
             self.ignore_sessions = True
@@ -252,11 +263,12 @@ class CMTSerialiser:
         else:
             session_file = input_root_dir / conf_info["input_data"]["sessions_spreadsheet"]
 
-        annuary = self.load_users(user_file)
-        papers, annuary, presenters = self.load_papers(metadata_file, pdfs_path, updated_pdfs_path)
+        _ = self.load_users(users_file)
+        _ = self.load_reviewers(reviewers_file)
+        papers, _, presenters = self.load_papers(metadata_file, pdfs_path, updated_pdfs_path)
 
         if self.ignore_sessions:
-            return self.load_conference(conf_metadata_file, papers=papers)
+            return self.load_conference(conf_metadata_file, papers=papers, sessions=None)
         else:
             sessions = self.load_sessions(session_file, papers, presenters)
             return self.load_conference(conf_metadata_file, sessions=sessions)
@@ -325,6 +337,79 @@ class CMTSerialiser:
 
         self._annuary = users
         return users
+
+    def load_reviewers(self, user_spreadsheet_file: pathlib.Path, ignore_role: bool = True) -> Annuary:
+        if self._annuary is None:
+            self._annuary = Annuary()
+
+        reviewers = Annuary()
+        wb = load_workbook(filename=user_spreadsheet_file)
+        for worksheet in wb.sheetnames:
+            df = load_excel(user_spreadsheet_file, sheet_name=worksheet)
+
+            for _, user_row in df.iterrows():
+                cur_reviewer = self._annuary.find_person_by_email(str(user_row["Email"]).strip())
+                if cur_reviewer is not None:
+                    cur_reviewer.add_role(Role.REVIEWER)
+                    reviewers.add(cur_reviewer)
+                    continue
+
+                first_name = str(user_row["First Name"]).strip()
+
+                middle_initial = ""
+                if not pd.isna(user_row["Middle Initial (optional)"]):
+                    middle_initial = str(user_row["Middle Initial (optional)"]).strip()
+
+                if pd.isna(user_row["Last Name"]) or (str(user_row["Last Name"]) == ""):
+                    last_name = first_name.strip()
+                    first_name = ""
+                else:
+                    last_name = str(user_row["Last Name"])
+
+                affiliation = Affiliation(
+                    institute=str(user_row["Organization"]).strip(),
+                )
+
+                roles = set()
+                if not ignore_role:
+                    for r in str(user_row["Roles"]).split(CMT_ROLE_SEP):
+                        if r == "Reviewer":
+                            roles.add(Role.REVIEWER)
+                        elif r == "Author":
+                            roles.add(Role.AUTHOR)
+                        elif r == "Meta-Reviewer":
+                            roles.add(Role.META_REVIEWER)
+                        elif r == "Senior Meta-Reviewer":
+                            roles.add(Role.SENIOR_META_REVIEWER)
+                        elif r == "Proceeding-Editor":
+                            roles.add(Role.PROCEEDING_EDITOR)
+                        elif r == "Chair":
+                            roles.add(Role.CHAIR)
+                        elif r == "Track Chair":
+                            roles.add(Role.TRACK_CHAIR)
+                        elif r == "Setting-Reader":
+                            roles.add(Role.SETTING_READER)
+                        elif r == "Not in CMT":
+                            self._logger.debug(
+                                f'User "{str(user_row["Email"]).strip()}" is not part of CMT users, inferred to be an author'
+                            )
+                            roles.add(Role.AUTHOR)
+                        else:
+                            raise Exception(f'The role ("{r}") is unknown')
+
+                cur_user = Person(
+                    first_name.strip(),
+                    last_name.strip(),
+                    email=str(user_row["Email"]).strip(),
+                    roles=roles,
+                    main_affiliation=affiliation,
+                    middle_initial=middle_initial,
+                )
+
+                reviewers.add(cur_user)
+
+
+        return reviewers
 
     def load_papers(
         self,
@@ -580,16 +665,25 @@ class CMTSerialiser:
                         paper_presenters = dict_presenters[paper_id]
 
                     if isinstance(cur_session, OralSession):
-                        cur_presentation = OralPresentation(
-                            f"{session_id}_{paper_idx}",
-                            cur_paper.title,
-                            paper_presenters,
-                            (
-                                cur_session.default_duration if paper_id not in bs_paper_ids else 40
-                            ),  # TODO: the duration is hardcoded
-                            cur_paper.abstract,
-                            cur_paper,
-                        )
+                        if paper_id in bs_paper_ids:
+                            cur_presentation = BlueSkyPresentation(
+                                f"{session_id}_{paper_idx}",
+                                cur_paper.title,
+                                paper_presenters,
+                                40, # TODO: the duration is hardcoded
+                                cur_paper.abstract,
+                                cur_paper,
+                            )
+                            print(f"{paper_id}")
+                        else:
+                            cur_presentation = OralPresentation(
+                                f"{session_id}_{paper_idx}",
+                                cur_paper.title,
+                                paper_presenters,
+                                cur_session.default_duration,
+                                cur_paper.abstract,
+                                cur_paper,
+                            )
                     elif isinstance(cur_session, PosterSession):
                         cur_presentation = PosterPresentation(
                             f"{session_id}_{paper_idx}",
@@ -682,7 +776,8 @@ class CMTSerialiser:
             chairs,
             conf_info["ISSN"] if "ISSN" in conf_info else None,
             conf_info["generateDOIs"] if "generateDOIs" in conf_info else False,
-            conf_info["theme"] if "theme" in conf_info else None
+            conf_info["theme"] if "theme" in conf_info else None,
+            annuary=self._annuary
         )
         if sessions is not None:
             for session in sessions:
