@@ -225,3 +225,15 @@ class ShowAndTellPresentation(Presentation):
         presented_paper: Paper | None = None,
     ):
         super().__init__(id, title, presenters, None, abstract, presented_paper)
+
+class BlueSkyPresentation(OralPresentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, duration, abstract, presented_paper)
