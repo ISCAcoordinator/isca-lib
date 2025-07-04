@@ -156,7 +156,7 @@ class Presentation(ISCAItem):
         return self._presented_paper
 
     def __str__(self):
-        talk_info = f"[{self.id}] {self.title}\n"
+        talk_info = f"[{self.__class__.__name__} - {self.id}] {self.title}\n"
         if self.presenters is not None:
             for presenter in self.presenters:
                 talk_info += f"  - {presenter}\n"
@@ -194,6 +194,17 @@ class PosterPresentation(Presentation):
         super().__init__(id, title, presenters, None, abstract, presented_paper)
 
 class SurveyTalk(OralPresentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int,
+        abstract: str | None = None,
+    ):
+        super().__init__(id, title, presenters, duration, abstract, None)
+
+class Keynote(OralPresentation):
     def __init__(
         self,
         id: str,

@@ -116,6 +116,7 @@ class Person:
         roles: set[Role] = set([Role.DEFAULT]),
         alternative_affiliations: dict[Affiliation, set[str]] | None = None,
         middle_initial: str | None = None,
+        biography: str | None = None,
         id: str | None = None,
     ):
         """Initialisation method
@@ -146,7 +147,7 @@ class Person:
         self.alternative_affiliations: dict[Affiliation, set[str]] = (
             alternative_affiliations if alternative_affiliations is not None else dict()
         )
-
+        self.biography: str | None = biography
         self._id: str = self._generate_id() if id is None else id
 
     def get_organization(self, paper_id: int = -1) -> str:
