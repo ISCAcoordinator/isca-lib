@@ -230,6 +230,18 @@ class Person:
 
         return author_name
 
+    @property
+    def name(self) -> str:
+        first = self.firstname
+        last = self.lastname
+        if not first:
+            return last
+
+        name = first
+        if self.middle_initial is not None:
+            name += " " + self.middle_initial
+        return name + " " + last
+
     def str_sorting_by_last_name(self) -> str:
         """Generate a string version of the current User to be used to sort users by their last names.
 
@@ -364,6 +376,14 @@ class Annuary:
             set_person.add(person)
 
         return set_person
+
+    @property
+    def reviewers(self) -> set[Person]:
+        reviewers = set()
+        for p in self._annuary:
+            if p.validate_roles(set([Role.REVIEWER])):
+                reviewers.add(p)
+        return reviewers
 
     def __repr__(self) -> str:
         output = ""

@@ -1,3 +1,4 @@
+import copy
 import datetime
 
 from .core import ISCAItem
@@ -39,7 +40,8 @@ class Conference(Event):
         chairs: list[Person] | None = None,
         issn: str | None = None,
         generate_doi: bool = False,
-        theme: dict[str, object] | None = None
+        theme: dict[str, object] | None = None,
+        annuary: Annuary | None = None
     ):
         super().__init__(id, name, start_date, end_date, location, url, theme)
         self.serie: str | None = serie
@@ -49,7 +51,7 @@ class Conference(Event):
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
         self._authors2papers: dict[Person, list[Paper]] = dict()
-        self._annuary: Annuary = Annuary()
+        self._annuary: Annuary = copy.copy(annuary) if annuary is not None else Annuary()
 
     def add_paper(self, paper: Paper, force_replace: bool = True):
         if (paper.id in self._papers) and (not force_replace):
@@ -99,11 +101,37 @@ class Conference(Event):
                     self._authors2papers[author] = []
                 self._authors2papers[author].append(paper)
 
+    def associate_sessions_to_rooms(self) -> dict[Room, list[PresentationSession]]:
+        if not self._sessions:
+            raise Exception("The sessions haven't been loaded")
+
+        room_sessions = dict()
+        for cur_session in self._sessions:
+            if not isinstance(cur_session, PresentationSession):
+                continue
+
+            if cur_session.room is None:
+                continue
+
+            if cur_session.room not in room_sessions:
+                room_sessions[cur_session.room] = list()
+
+            room_sessions[cur_session.room].append(cur_session)
+
+        for cur_room, sessions in room_sessions.items():
+            room_sessions[cur_room] = sorted(sessions, key=lambda x: x.start)
+
+        return room_sessions
+
     def list_papers(self, author: Person) -> list[Paper]:
         if (author not in self._authors2papers):
             return []
 
         return self._authors2papers[author]
+
+    @property
+    def reviewers(self) -> set[Person]:
+        return set(self._annuary.reviewers)
 
     @property
     def authors(self) -> set[Person]:
