@@ -1,3 +1,4 @@
+from enum import Enum
 import datetime
 
 from .core import ISCAItem
@@ -18,7 +19,6 @@ class Room(ISCAItem):
             str += f" (capacity={self.capacity})"
 
         return str + f" [{self.type}]"
-
 
 class Session(ISCAItem):
     def __init__(
@@ -213,3 +213,73 @@ class ShowAndTellSession(PresentationSession):
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, start, end, room, presentations, chairs)
+
+
+class TimeslotType(Enum):
+    CEREMONY = 0
+    KEYNOTE = 1
+    COFFEE_BREAK = 2
+    LUNCH_BREAK = 3
+    ASSEMBLY = 4
+    SCIENCE = 5
+
+    def __str__(self) -> str:
+        """Return the string representation of the role
+
+        Returns
+        -------
+        str
+            the (uppercase) name of the role
+        """
+        return f'{self.name.replace("TimeslotType.", "")}'
+
+
+class Timeslot(ISCAItem):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        type: TimeslotType,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        sessions: list[PresentationSession] | None = None
+    ):
+        super().__init__(id)
+        self.name: str = name
+        self.type: TimeslotType = type
+        self.start: datetime.datetime = start
+        self.end: datetime.datetime = end
+        self.sessions: list[PresentationSession] | None = sessions
+
+    @property
+    def date(self) -> datetime.date:
+        return self.start.date()
+
+    def __repr__(self) -> str:
+        date = self.date.strftime("%Y-%m-%d")
+        start = self.start.strftime("%H:%M")
+        end = self.end.strftime("%H:%M")
+        return f"Timeslot(id={self.id}, name={self.name}, type={self.type}, date={date}, start={start}, end={end})"
+
+    def timeslot_without_date(self) -> str:
+        start = self.start.strftime("%H:%M")
+        end = self.end.strftime("%H:%M")
+        return f"{start} -- {end}"
+
+    def add_session(self, session: PresentationSession):
+        if self.sessions is None:
+            self.sessions = list()
+        self.sessions.append(session)
+
+    def get_session_in_room(self, room: Room) -> PresentationSession | None:
+        wanted_session = None
+        if self.sessions is not None:
+            for session in self.sessions:
+                if session.room == room:
+                    wanted_session = session
+                    break
+
+        return wanted_session
+
+    def __str__(self) -> str:
+        return repr(self)

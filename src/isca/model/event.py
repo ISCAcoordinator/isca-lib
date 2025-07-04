@@ -4,7 +4,7 @@ import datetime
 from .core import ISCAItem
 from .item import Paper
 from .person import Person, Annuary
-from .session import Session, PresentationSession, Room
+from .session import Session, PresentationSession, Room, Timeslot
 
 
 class Event(ISCAItem):
@@ -50,6 +50,7 @@ class Conference(Event):
         self.chairs: list[Person] | None = chairs
         self._papers: dict[str, Paper] = dict()
         self._sessions: list[Session] = list()
+        self._timeslots: list[Timeslot] = list()
         self._authors2papers: dict[Person, list[Paper]] = dict()
         self._annuary: Annuary = copy.copy(annuary) if annuary is not None else Annuary()
 
@@ -71,6 +72,25 @@ class Conference(Event):
 
     def update_paper(self, paper: Paper):
         self.add_paper(paper, force_replace=True)
+
+    def add_timeslot(self, timeslot: Timeslot):
+        self._timeslots.append(timeslot)
+        if timeslot.sessions is None:
+            return
+
+        for session in timeslot.sessions:
+            self.add_session(session)
+
+    def get_timeslots(self, day: datetime.date | None=None) -> list[Timeslot]:
+        if day is None:
+            return self._timeslots
+
+        timeslots = []
+        for timeslot in self._timeslots:
+            if timeslot.start.date() == day:
+                timeslots.append(timeslot)
+
+        return sorted(timeslots, key=lambda x: x.start)
 
     def add_session(self, session: Session, force_replace: bool = True):
         if (session.id in self._sessions) and (not force_replace):
