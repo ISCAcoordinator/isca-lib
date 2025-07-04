@@ -82,6 +82,12 @@ class PresentationSession(Session):
     def end(self) -> datetime.datetime:
         return self._end
 
+    def start_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+        return self.start
+
+    def end_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+        return self.end
+
     def sort_criterion(self) -> str:
         return "_".join([str(s) for s in (self.start, self._end, self.id, self.name)])
 
@@ -103,7 +109,7 @@ class OralSession(PresentationSession):
 
     def add_presentation(self, presentation: Presentation):
         if not isinstance(presentation, OralPresentation):
-            raise Exception("The presentation should be an Oral Presentation")
+            raise Exception(f"[{self.id}] The presentation ({presentation.id}) should be an Oral Presentation")
 
         total_duration = (self.end - self.start).seconds / 60
         expected_duration = 0
@@ -115,7 +121,7 @@ class OralSession(PresentationSession):
 
         if expected_duration > total_duration:
             raise Exception(
-                f'When adding the presentation to session "{self.id}", the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes.'
+                f'[{self.id}] When adding the presentation to session "{self.id}", the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes.'
             )
         super().add_presentation(presentation)
 
@@ -125,7 +131,7 @@ class OralSession(PresentationSession):
         if isinstance(presentation, int):
             assert presentation < len(
                 self.presentations
-            ), f"There are not enough presentation in the session ({len(self.presentations)} < {presentation})"
+            ), f"[{self.id}] There are not enough presentation in the session ({len(self.presentations)} < {presentation})"
 
             for pres_idx, cur_presentation in enumerate(self.presentations):
                 if pres_idx >= presentation:
@@ -139,7 +145,6 @@ class OralSession(PresentationSession):
                     break
 
                 start += datetime.timedelta(minutes=cur_presentation.duration)
-
 
         return start
 
