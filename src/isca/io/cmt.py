@@ -12,8 +12,27 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Affiliation, Role, Annuary
-from ..model.item import BlueSkyPresentation, Paper, OralPresentation, PosterPresentation, SurveyTalk, SpecialPresentation, ShowAndTellPresentation
-from ..model.session import Session, OralSession, PosterSession, SpecialSession, ShowAndTellSession, Room
+from ..model.item import (
+    BlueSkyPresentation,
+    Paper,
+    OralPresentation,
+    PosterPresentation,
+    SurveyTalk,
+    SpecialPresentation,
+    ShowAndTellPresentation,
+    Keynote,
+)
+from ..model.session import (
+    KeynoteSession,
+    Session,
+    OralSession,
+    PosterSession,
+    SpecialSession,
+    ShowAndTellSession,
+    Room,
+    Timeslot,
+    TimeslotType,
+)
 from ..model.event import Conference
 
 # IO Utils
@@ -31,6 +50,7 @@ CMT_CORRESPONDING_MARKER = "*"
 CMT_SESSION_TIMESLOTS_SHEET_NAME = "Timeslots"
 CMT_SESSION_SESSIONS_SHEET_NAME = "Sessions"
 CMT_SESSION_ROOMS_SHEET_NAME = "Rooms"
+CMT_SESSION_KEYNOTE_SHEET_NAME = "Keynotes"
 CMT_SESSION_BLUESKY_SHEET_NAME = "BlueSky Papers"
 CMT_SESSION_SURVEY_TALKS_SHEET_NAME = "Survey Talks"
 CMT_SESSION_PAPER_SEPARATOR = ","
@@ -73,9 +93,7 @@ class CMTSerialiser:
         self.ignore_sessions = ignore_sessions
         self._annuary = Annuary()
 
-    def _extract_df_information(
-        self, paper_info: pd.Series
-    ) -> tuple[Paper, list[Person] | None]:
+    def _extract_df_information(self, paper_info: pd.Series) -> tuple[Paper, list[Person] | None]:
 
         author_names = (
             str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
@@ -202,7 +220,7 @@ class CMTSerialiser:
             abstract = str(paper_info["Abstract"])
         elif "Paper Abstract" in paper_info:
             abstract = str(paper_info["Paper Abstract"])
-        abstract = re.sub(r'(?<!\n)\n(?=\S)', ' ', abstract) # NOTE: merge consecutive lines
+        abstract = re.sub(r"(?<!\n)\n(?=\S)", " ", abstract)  # NOTE: merge consecutive lines
 
         # Fix title
         title = str(paper_info["Paper Title"])
@@ -270,8 +288,8 @@ class CMTSerialiser:
         if self.ignore_sessions:
             return self.load_conference(conf_metadata_file, papers=papers, sessions=None)
         else:
-            sessions = self.load_sessions(session_file, papers, presenters)
-            return self.load_conference(conf_metadata_file, sessions=sessions)
+            _, timeslots = self.load_sessions(session_file, papers, presenters)
+            return self.load_conference(conf_metadata_file, timeslots=list(timeslots.values()))
 
     def load_users(self, user_spreadsheet_file: pathlib.Path, ignore_role: bool = True) -> Annuary:
         users = Annuary()
@@ -408,7 +426,6 @@ class CMTSerialiser:
 
                 reviewers.add(cur_user)
 
-
         return reviewers
 
     def load_papers(
@@ -524,9 +541,44 @@ class CMTSerialiser:
             bs_paper_ids.add(str(bs_row["Paper ID"]))
         return bs_paper_ids
 
-    def _load_survey_talks(
-        self, session_summary_file: pathlib.Path
-    ) -> dict[str, SurveyTalk]:
+    def _load_keynotes(self, session_summary_file: pathlib.Path) -> dict[str, Keynote]:
+        df = load_excel(
+            session_summary_file,
+            sheet_name=CMT_SESSION_KEYNOTE_SHEET_NAME,
+        )
+
+        keynotes = dict()
+        for _, row in df.iterrows():
+            email = str(row["Email"])
+            speaker = self._annuary.find_person_by_email(email)
+            if speaker is None:
+                affiliation = Affiliation(row["Organization"], row["Country"])
+                speaker = Person(
+                    row["First Name"],
+                    row["Last Name"],
+                    affiliation,
+                    email,
+                    set(),
+                    None,
+                    row["Middle Initial"] if "Middle Initial" in row else None,
+                )
+
+            speaker.add_role(Role.PRESENTER)
+            speaker.biography = row["Bio"]
+
+            keynote = Keynote(
+                row["Keynote ID"],
+                row["Paper Title"],
+                [speaker], # FIXME: duration is hardcoded
+                60,
+                row["Abstract"]
+            )
+
+            keynotes[keynote.id] = keynote
+
+        return keynotes
+
+    def _load_survey_talks(self, session_summary_file: pathlib.Path) -> dict[str, SurveyTalk]:
         df = load_excel(
             session_summary_file,
             sheet_name=CMT_SESSION_SURVEY_TALKS_SHEET_NAME,
@@ -583,7 +635,9 @@ class CMTSerialiser:
         session_summary_file: pathlib.Path,
         dict_papers: dict[str, Paper] = {},
         dict_presenters: dict[str, list[Person] | None] = {},
-    ) -> list[Session]:
+    ) -> tuple[list[Session], dict[str, Timeslot]]:
+
+        list_sessions = []
 
         # Load rooms
         dict_room = dict()
@@ -605,6 +659,10 @@ class CMTSerialiser:
             )
             dict_room[room.name] = room
 
+        # Load the keynotes
+        keynotes = self._load_keynotes(session_summary_file)
+        keynote_sessions = []
+
         # Now load timeslots
         dict_timeslots = dict()
         df = load_excel(session_summary_file, sheet_name=CMT_SESSION_TIMESLOTS_SHEET_NAME)
@@ -614,16 +672,39 @@ class CMTSerialiser:
             start_time = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             end_time = f"{timeslot_info['Date']} {timeslot_info['End']}"
             end_time = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
-            dict_timeslots[timeslot_info["Timeslot name"]] = [start_time, end_time]
+            cur_timeslot = Timeslot(
+                timeslot_info["Timeslot name"],
+                timeslot_info["Timeslot name"],
+                TimeslotType.KEYNOTE,
+                start_time,
+                end_time,
+            )
 
-        # TODO: prepare the surveys!
+            # Check if the timeslot is dedicated to a keynote session
+            if timeslot_info["Timeslot name"] in keynotes:
+                keynote = keynotes[timeslot_info["Timeslot name"]]
+                if keynote.presenters is None:
+                    raise Exception(f"[{keynote.id}] The keynote doesn't have speaker")
+                title = ", ".join([p.name for p in keynote.presenters]) + ": " + keynote.title
+                session = KeynoteSession(
+                    keynote.id,
+                    title,
+                    start_time,
+                    end_time,
+                    None,
+                    presentations=[keynote],
+                )
+                list_sessions.append(session)
+                cur_timeslot.add_session(session)
+
+            dict_timeslots[timeslot_info["Timeslot name"]] = cur_timeslot
+
+
+        # Load additional elements
         survey_talks = self._load_survey_talks(session_summary_file)
-
-        # TODO: Set the list of blue sky papers
         bs_paper_ids = self._list_bluesky_paper_ids(session_summary_file)
 
-        # Create the sessions
-        list_sessions = []
+        # Add the scientific sessions
         df = load_excel(session_summary_file, sheet_name=CMT_SESSION_SESSIONS_SHEET_NAME)
         for _, session_info in df.iterrows():
             if pd.isna(session_info["Session name"]):
@@ -638,13 +719,15 @@ class CMTSerialiser:
 
             session_type = str(session_info["Session type"])
             if session_type.lower() == "oral":
-                cur_session = OralSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                cur_session = OralSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room)
             elif session_type.lower() == "poster":
-                cur_session = PosterSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                cur_session = PosterSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room)
             elif session_type.lower() == "show and tell":
-                cur_session = ShowAndTellSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                cur_session = ShowAndTellSession(
+                    session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room
+                )
             elif session_type.lower() == "special":
-                cur_session = SpecialSession(session_id, session_name, cur_time_slot[0], cur_time_slot[1], cur_room)
+                cur_session = SpecialSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room)
             else:
                 self._logger.error(
                     f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
@@ -670,11 +753,10 @@ class CMTSerialiser:
                                 f"{session_id}_{paper_idx}",
                                 cur_paper.title,
                                 paper_presenters,
-                                40, # TODO: the duration is hardcoded
+                                40,  # TODO: the duration is hardcoded
                                 cur_paper.abstract,
                                 cur_paper,
                             )
-                            print(f"{paper_id}")
                         else:
                             cur_presentation = OralPresentation(
                                 f"{session_id}_{paper_idx}",
@@ -724,13 +806,16 @@ class CMTSerialiser:
             self._logger.debug(
                 f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session}
             )
+            cur_time_slot.add_session(cur_session)
             list_sessions.append(cur_session)
 
-        return list_sessions
+
+        return list_sessions, dict_timeslots
 
     def load_conference(
         self,
         conference_info_file: pathlib.Path,
+        timeslots: list[Timeslot] | None = None,
         sessions: list[Session] | None = None,
         papers: dict[str, Paper] | None = None,
     ) -> Conference:
@@ -777,9 +862,12 @@ class CMTSerialiser:
             conf_info["ISSN"] if "ISSN" in conf_info else None,
             conf_info["generateDOIs"] if "generateDOIs" in conf_info else False,
             conf_info["theme"] if "theme" in conf_info else None,
-            annuary=self._annuary
+            annuary=self._annuary,
         )
-        if sessions is not None:
+        if timeslots is not None:
+            for timeslot in timeslots:
+                conf.add_timeslot(timeslot)
+        elif sessions is not None:
             for session in sessions:
                 conf.add_session(session)
         elif papers is not None:
