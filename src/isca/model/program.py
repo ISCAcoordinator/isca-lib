@@ -1,9 +1,142 @@
 from enum import Enum
 import datetime
 
-from .core import ISCAItem
+from .item import ISCAItem, Paper, Session
 from .person import Person
-from .item import Presentation, PosterPresentation, OralPresentation
+
+
+#########################################################################################################
+### Presentation classes
+#########################################################################################################
+class Presentation(ISCAItem):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int | None,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id)
+
+        self.title: str = title
+        self.presenters: list[Person] | None = presenters
+        self.abstract: str | None = abstract
+        self._duration: int | None = duration
+        self._presented_paper: Paper | None = presented_paper
+
+    @property
+    def duration(self) -> int | None:
+        return self._duration
+
+    @property
+    def presented_paper(self) -> Paper | None:
+        return self._presented_paper
+
+    def __str__(self):
+        talk_info = f"[{self.__class__.__name__} - {self.id}] {self.title}\n"
+        if self.presenters is not None:
+            for presenter in self.presenters:
+                talk_info += f"  - {presenter}\n"
+
+        return talk_info
+
+
+class OralPresentation(Presentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, duration, abstract, presented_paper)
+
+    @property
+    def duration(self) -> int:
+        assert self._duration is not None
+        return self._duration
+
+
+class PosterPresentation(Presentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, None, abstract, presented_paper)
+
+
+class SurveyTalk(OralPresentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int,
+        abstract: str | None = None,
+    ):
+        super().__init__(id, title, presenters, duration, abstract, None)
+
+
+class Keynote(OralPresentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int,
+        abstract: str | None = None,
+    ):
+        super().__init__(id, title, presenters, duration, abstract, None)
+
+
+class SpecialPresentation(Presentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, None, abstract, presented_paper)
+
+
+class ShowAndTellPresentation(Presentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, None, abstract, presented_paper)
+
+
+class BlueSkyPresentation(OralPresentation):
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        presenters: list[Person] | None,
+        duration: int,
+        abstract: str | None = None,
+        presented_paper: Paper | None = None,
+    ):
+        super().__init__(id, title, presenters, duration, abstract, presented_paper)
+
+
+#########################################################################################################
+### Sessions
+#########################################################################################################
 
 
 class Room(ISCAItem):
@@ -20,16 +153,34 @@ class Room(ISCAItem):
 
         return str + f" [{self.type}]"
 
-class Session(ISCAItem):
+
+class PresentationSession(Session):
     def __init__(
         self,
         id: str,
         name: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        room: Room | None = None,
         presentations: list[Presentation] | None = None,
+        chairs: list[Person] | None = None,
     ):
-        super().__init__(id)
-        self.name = name
+        super().__init__(id, name)
         self._presentations = presentations if presentations is not None else []
+        self.chairs = chairs if chairs is not None else []
+        self.room = room
+
+        # For now, start/end can't be modified to avoid side effects!
+        self._start = start
+        self._end = end
+
+    @property
+    def start(self) -> datetime.datetime:
+        return self._start
+
+    @property
+    def end(self) -> datetime.datetime:
+        return self._end
 
     @property
     def presentations(self) -> list[Presentation]:
@@ -51,41 +202,10 @@ class Session(ISCAItem):
             raise ValueError(f'"{presentation_out.id}" is not part of the session, so it can\'t be replaced')
         self._presentations[idx] = presentation_in
 
-    def sort_criterion(self) -> str:
-        return self.id
-
-
-class PresentationSession(Session):
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        start: datetime.datetime,
-        end: datetime.datetime,
-        room: Room | None = None,
-        presentations: list[Presentation] | None = None,
-        chairs: list[Person] | None = None,
-    ):
-        super().__init__(id, name, presentations)
-        self.chairs = chairs if chairs is not None else []
-        self.room = room
-
-        # For now, start/end can't be modified to avoid side effects!
-        self._start = start
-        self._end = end
-
-    @property
-    def start(self) -> datetime.datetime:
-        return self._start
-
-    @property
-    def end(self) -> datetime.datetime:
-        return self._end
-
-    def start_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+    def start_presentation(self, _: Presentation | int) -> datetime.datetime:
         return self.start
 
-    def end_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+    def end_presentation(self, _: Presentation | int) -> datetime.datetime:
         return self.end
 
     def sort_criterion(self) -> str:
@@ -137,7 +257,6 @@ class OralSession(PresentationSession):
                 if pres_idx >= presentation:
                     break
 
-
                 start += datetime.timedelta(minutes=cur_presentation.duration)
         elif isinstance(presentation, Presentation):
             for cur_presentation in self.presentations:
@@ -151,7 +270,6 @@ class OralSession(PresentationSession):
     def end_presentation(self, presentation: Presentation | int) -> datetime.datetime:
         if isinstance(presentation, int):
             presentation = self.presentations[presentation]
-
 
         return self.start_presentation(presentation) + datetime.timedelta(minutes=presentation.duration)
 
@@ -188,6 +306,7 @@ class PosterSession(PresentationSession):
     ):
         super().__init__(id, name, start, end, room, presentations, chairs)
 
+
 class SpecialSession(PresentationSession):
     def __init__(
         self,
@@ -201,6 +320,7 @@ class SpecialSession(PresentationSession):
     ):
         super().__init__(id, name, start, end, room, presentations, chairs)
 
+
 class ShowAndTellSession(PresentationSession):
     def __init__(
         self,
@@ -213,6 +333,11 @@ class ShowAndTellSession(PresentationSession):
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, start, end, room, presentations, chairs)
+
+
+#########################################################################################################
+### Program
+#########################################################################################################
 
 
 class TimeslotType(Enum):
@@ -242,7 +367,7 @@ class Timeslot(ISCAItem):
         type: TimeslotType,
         start: datetime.datetime,
         end: datetime.datetime,
-        sessions: list[PresentationSession] | None = None
+        sessions: list[PresentationSession] | None = None,
     ):
         super().__init__(id)
         self.name: str = name

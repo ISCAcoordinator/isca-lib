@@ -12,19 +12,16 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Affiliation, Role, Annuary
-from ..model.item import (
+from ..model.item import Paper, Session
+from ..model.program import (
     BlueSkyPresentation,
-    Paper,
     OralPresentation,
     PosterPresentation,
     SurveyTalk,
     SpecialPresentation,
     ShowAndTellPresentation,
     Keynote,
-)
-from ..model.session import (
     KeynoteSession,
-    Session,
     OralSession,
     PosterSession,
     SpecialSession,

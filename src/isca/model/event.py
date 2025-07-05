@@ -1,10 +1,9 @@
 import copy
 import datetime
 
-from .core import ISCAItem
-from .item import Paper
+from .item import ISCAItem, Paper, Session
 from .person import Person, Annuary
-from .session import Session, PresentationSession, Room, Timeslot
+from .program import PresentationSession, Room, Timeslot
 
 
 class Event(ISCAItem):

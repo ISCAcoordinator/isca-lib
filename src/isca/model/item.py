@@ -1,8 +1,17 @@
-import logging
 import pathlib
 
-from .core import ISCAItem
+from .core import ISCAObject
 from .person import Affiliation, Person
+
+
+class ISCAItem(ISCAObject):
+    def __init__(self, id: str):
+        super().__init__()
+        self._id = id
+
+    @property
+    def id(self) -> str:
+        return self._id
 
 
 class Paper(ISCAItem):
@@ -128,123 +137,14 @@ class PublishedPaper(Paper):
         self.author_area_id: str | None = author_area_id
         self.author_area_label: str | None = author_area_label
 
-
-class Presentation(ISCAItem):
+class Session(ISCAItem):
     def __init__(
         self,
         id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int | None,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
+        name: str,
     ):
         super().__init__(id)
+        self.name = name
 
-        self.title: str = title
-        self.presenters: list[Person] | None = presenters
-        self.abstract: str | None = abstract
-        self._duration: int | None = duration
-        self._presented_paper: Paper | None = presented_paper
-
-    @property
-    def duration(self) -> int | None:
-        return self._duration
-
-    @property
-    def presented_paper(self) -> Paper | None:
-        return self._presented_paper
-
-    def __str__(self):
-        talk_info = f"[{self.__class__.__name__} - {self.id}] {self.title}\n"
-        if self.presenters is not None:
-            for presenter in self.presenters:
-                talk_info += f"  - {presenter}\n"
-
-        return talk_info
-
-
-class OralPresentation(Presentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, duration, abstract, presented_paper)
-
-    @property
-    def duration(self) -> int:
-        assert self._duration is not None
-        return self._duration
-
-
-class PosterPresentation(Presentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, None, abstract, presented_paper)
-
-class SurveyTalk(OralPresentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int,
-        abstract: str | None = None,
-    ):
-        super().__init__(id, title, presenters, duration, abstract, None)
-
-class Keynote(OralPresentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int,
-        abstract: str | None = None,
-    ):
-        super().__init__(id, title, presenters, duration, abstract, None)
-
-class SpecialPresentation(Presentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, None, abstract, presented_paper)
-
-class ShowAndTellPresentation(Presentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, None, abstract, presented_paper)
-
-class BlueSkyPresentation(OralPresentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, duration, abstract, presented_paper)
+    def sort_criterion(self) -> str:
+        return self.id
