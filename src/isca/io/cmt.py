@@ -95,7 +95,7 @@ class CMTSerialiser:
         author_names = (
             str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
         )
-        author_emails = str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)
+        author_emails = [email.lower().strip() for email in str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)]
 
         # The number of elements should be the same
         if len(author_emails) != len(author_names):
