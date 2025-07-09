@@ -48,6 +48,7 @@ class Paper(ISCAItem):
         alternative_affiliations: dict[Person, Affiliation] | None = None,
         track: str | None = None,
         metadata_from_pdf: bool = False,
+        resource: str | None = None
     ):
         """Initialisation method
 
@@ -78,7 +79,7 @@ class Paper(ISCAItem):
         )
         self.metadata_from_pdf: bool = metadata_from_pdf
         self.track: str | None = track
-
+        self.resource: str | None = resource
         self._id: str | None = id
 
         self.pdf_file = pdf_file
