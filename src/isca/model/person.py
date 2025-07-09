@@ -111,10 +111,10 @@ class Person:
         self,
         firstname: str | None,
         lastname: str,
-        main_affiliation: Affiliation,
+        default_affiliation: Affiliation,
         email: str | None = None,
         roles: set[Role] = set([Role.DEFAULT]),
-        alternative_affiliations: dict[Affiliation, set[str]] | None = None,
+        paper_affiliations: dict[str, list[Affiliation]] | None = None,
         middle_initial: str | None = None,
         biography: str | None = None,
         id: str | None = None,
@@ -140,12 +140,12 @@ class Person:
         self._logger = logging.getLogger(self.__class__.__name__)
         self.firstname: str | None = firstname
         self.lastname: str = lastname
-        self.main_affiliation: Affiliation = main_affiliation
+        self.default_affiliation: Affiliation = default_affiliation
         self.middle_initial: str | None = middle_initial
         self._roles: set[Role] = roles
         self.email: str | None = email
-        self.alternative_affiliations: dict[Affiliation, set[str]] = (
-            alternative_affiliations if alternative_affiliations is not None else dict()
+        self.paper_affiliations: dict[str, list[Affiliation]] = (
+            paper_affiliations if paper_affiliations is not None else dict()
         )
         self.biography: str | None = biography
         self._id: str = self._generate_id() if id is None else id
@@ -243,6 +243,18 @@ class Person:
             name += " " + self.middle_initial
         return name + " " + last
 
+    @property
+    def isca_name(self) -> str:
+        first = self.firstname
+        last = self.lastname
+        if not first:
+            return last
+
+        name = first
+        if self.middle_initial is not None:
+            name += " " + self.middle_initial
+        return name + " {" + last + "}"
+
     def str_sorting_by_last_name(self) -> str:
         """Generate a string version of the current User to be used to sort users by their last names.
 
@@ -259,15 +271,20 @@ class Person:
         Person._counter += 1
         return str(Person._counter)
 
-    def str_with_flatten_affiliations(self, paper_id: str, short=False) -> str:
-        str_person = str(self)
-        affiliations = []
-        if short:
-            affiliations.append(self.main_affiliation.institute)
+    def str_with_flatten_affiliations(self, paper_id: str, short=False, markers=True) -> str:
+        if markers:
+            str_person = self.isca_name
         else:
-            affiliations.append(str(self.main_affiliation))
-        for affiliation, papers in self.alternative_affiliations.items():
-            if paper_id in papers:
+            str_person = str(self)
+
+        affiliations = []
+        if paper_id not in self.paper_affiliations:
+            if short:
+                affiliations.append(self.default_affiliation.institute)
+            else:
+                affiliations.append(str(self.default_affiliation))
+        else:
+            for affiliation in self.paper_affiliations[paper_id]:
                 if short:
                     affiliation = affiliation.institute
                 else:
@@ -277,10 +294,11 @@ class Person:
 
         return str_person
 
-    def add_alternative_affiliation(self, affiliation: Affiliation, paper_id: str):
-        if affiliation not in self.alternative_affiliations:
-            self.alternative_affiliations[affiliation] = set()
-        self.alternative_affiliations[affiliation].add(paper_id)
+    def add_paper_affiliation(self, paper_id: str, affiliation: Affiliation):
+        if paper_id not in self.paper_affiliations:
+            self.paper_affiliations[paper_id] = list()
+        self.paper_affiliations[paper_id].append(affiliation)
+
 
     @property
     def id(self) -> str:
@@ -297,7 +315,7 @@ class Person:
         return hash(self._id)
 
     def __repr__(self) -> str:
-        return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.main_affiliation}]), roles=({self._roles})"
+        return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
 
     def __str__(self) -> str:
         last_name = self.lastname
@@ -329,11 +347,11 @@ class Person:
             return False
 
         # Check affiliations as it can be a bit tricky here
-        if self.main_affiliation in other.alternative_affiliations:
+        if self.default_affiliation in other.paper_affiliations:
             return True
-        elif self.main_affiliation in self.alternative_affiliations:
+        elif self.default_affiliation in self.paper_affiliations:
             return True
-        elif set(self.alternative_affiliations.keys()).intersection(set(other.alternative_affiliations.keys())):
+        elif set(self.paper_affiliations.keys()).intersection(set(other.paper_affiliations.keys())):
             return True
 
         return False

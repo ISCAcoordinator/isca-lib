@@ -141,7 +141,7 @@ class CMTSerialiser:
                 first_name = " ".join(author_elts[:-1])
 
             # FIXME: As for now, we dunno how to extract the affiliation component, just consider an institute
-            list_affiliations = []
+            list_affiliations = list()
             affiliations = [s.strip() for s in match_author_affiliations.group(2).split(CMT_AFFILIATION_SEPARATOR)]
             for f in affiliations:
                 match_affiliation = CMT_AFFILIATION_REGEXP.match(f)
@@ -171,34 +171,30 @@ class CMTSerialiser:
             #         cur_person = list(candidates)[0]
 
             if cur_person is None:
-                alternative_affiliations = None
-                if len(list_affiliations) > 1:
-                    alternative_affiliations = dict()
-                    for affiliation in list_affiliations:
-                        alternative_affiliations[affiliation] = set([str(paper_info["Paper ID"])])
-
                 cur_person = Person(
                     first_name,
                     last_name,
                     email=email,
-                    main_affiliation=list_affiliations[0],
-                    alternative_affiliations=alternative_affiliations,
+                    default_affiliation=list_affiliations[0],
                     roles=set([Role.AUTHOR]),
                 )
+
             else:
                 cur_person.add_role(Role.AUTHOR)
+                # NOTE: The information from the PDF are likely more reliable
                 cur_person.firstname = first_name
                 cur_person.lastname = last_name
-                alternative_affiliations = dict()
-                for affiliation in list_affiliations:
-                    cur_person.add_alternative_affiliation(affiliation, str(paper_info["Paper ID"]))
+
+            for affiliation in list_affiliations:
+                cur_person.add_paper_affiliation(str(paper_info["Paper ID"]), affiliation)
             self._annuary.add(cur_person)
             paper_authors.append(cur_person)
 
         # Extract presenters (TODO: This is a bit too specific, will have to check with Antoine about this)
         presenters = None
         if "Q7 (Presenter - Value)" in paper_info:
-            presenter_idx = paper_info["Q7 (Presenter - Value)"] - 1
+            presenter_idx = int(paper_info["Q7 (Presenter - Value)"]) - 1
+
             if presenter_idx >= len(paper_authors):
                 raise IndexError(
                     f"[{paper_info['Paper ID']}] Author {presenter_idx} can't be a presenter as there are only {len(paper_authors)} authors"
@@ -344,7 +340,7 @@ class CMTSerialiser:
                     last_name.strip(),
                     email=str(user_row["Email"]).strip(),
                     roles=roles,
-                    main_affiliation=affiliation,
+                    default_affiliation=affiliation,
                     middle_initial=middle_initial,
                 )
 
@@ -417,7 +413,7 @@ class CMTSerialiser:
                     last_name.strip(),
                     email=str(user_row["Email"]).strip(),
                     roles=roles,
-                    main_affiliation=affiliation,
+                    default_affiliation=affiliation,
                     middle_initial=middle_initial,
                 )
 
@@ -612,7 +608,7 @@ class CMTSerialiser:
                     last_name.strip(),
                     email=str(survey_talk["Email"]).strip(),
                     roles=roles,
-                    main_affiliation=affiliation,
+                    default_affiliation=affiliation,
                     middle_initial=middle_initial,
                 )
             presenters = [presenter]
@@ -886,8 +882,8 @@ class CMTSerialiser:
                 author_str += f"{{{author.lastname}}}"
 
                 # TODO: add affiliations
-                list_aff = [str(author.main_affiliation)]
-                for aff, paper_id in author.alternative_affiliations.items():
+                list_aff = [str(author.default_affiliation)]
+                for aff, paper_id in author.paper_affiliations.items():
                     list_aff.append(str(aff))
                 author_str += f"({CMT_AFFILIATION_SEPARATOR.join(list_aff)})"
 

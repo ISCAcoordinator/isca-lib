@@ -5,7 +5,6 @@ import pymupdf
 
 from ...model.person import Affiliation
 from ...model.person import Person
-from ...model.item import Paper
 
 PDF_WORD_KEYWORD = "INTERSPEECH2025_WORD_TEMPLATE"
 PDF_AFFILIATION_KEY = "Affiliation"
@@ -95,9 +94,9 @@ def _get_authors(metadata: dict[str, str], affiliations: dict[str, Affiliation] 
             cur_author = Person(
                 first_name,
                 last_name,
-                main_affiliation=main_affiliation,
+                default_affiliation=main_affiliation,
                 email=email,
-                alternative_affiliations=alternative_affiliations,
+                paper_affiliations=alternative_affiliations,
             )
             list_authors.append(cur_author)
         else:
