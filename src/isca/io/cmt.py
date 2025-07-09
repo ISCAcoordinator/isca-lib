@@ -14,6 +14,7 @@ import pandas as pd
 from ..model.person import Person, Affiliation, Role, Annuary
 from ..model.item import Paper, Session
 from ..model.program import (
+    Program,
     BlueSkyPresentation,
     OralPresentation,
     PosterPresentation,
@@ -291,8 +292,8 @@ class CMTSerialiser:
         if self.ignore_sessions:
             return self.load_conference(conf_metadata_file, papers=papers, sessions=None)
         else:
-            _, timeslots = self.load_sessions(session_file, papers, presenters)
-            return self.load_conference(conf_metadata_file, timeslots=list(timeslots.values()))
+            _, program = self.load_sessions(session_file, papers, presenters)
+            return self.load_conference(conf_metadata_file, program=program, papers=papers)
 
     def load_users(self, user_spreadsheet_file: pathlib.Path, ignore_role: bool = True) -> Annuary:
         users = Annuary()
@@ -450,6 +451,7 @@ class CMTSerialiser:
             no_pdf = 0
             for _, paper_info in df.iterrows():
                 paper_id = paper_info["Paper ID"]
+
                 # Ignore withdrawn papers
                 if ("Withdrawn" in paper_info) and (paper_info["Withdrawn"]):
                     self._logger.info(f"[{paper_id}] The paper is withdrawn")
@@ -641,14 +643,14 @@ class CMTSerialiser:
     def load_sessions(
         self,
         session_summary_file: pathlib.Path,
-        dict_papers: dict[str, Paper] = {},
+        dict_papers: dict[str, Paper],
         dict_presenters: dict[str, list[Person] | None] = {},
     ) -> tuple[list[Session], dict[str, Timeslot]]:
 
         list_sessions = []
 
         # Load rooms
-        dict_room = dict()
+        dict_rooms = dict()
         df = load_excel(session_summary_file, sheet_name=CMT_SESSION_ROOMS_SHEET_NAME)
         for _, room_info in df.iterrows():
             capacity = str(room_info["Capacity"]).strip()
@@ -659,17 +661,17 @@ class CMTSerialiser:
             else:
                 capacity = int(capacity)
 
+            nb_zones = 1
+            if ("Nb Zones" in room_info) and (not pd.isna(room_info["Nb Zones"])):
+                nb_zones = int(room_info["Nb Zones"])
+
             room = Room(
                 str(room_info["Room name"]).replace(" ", "_"),
                 str(room_info["Room name"]),
                 str(room_info["Room type"]),
-                capacity,
+                nb_zones,
             )
-            dict_room[room.name] = room
-
-        # Load the keynotes
-        keynotes = self._load_keynotes(session_summary_file)
-        keynote_sessions = []
+            dict_rooms[room.name] = room
 
         # Now load timeslots
         dict_timeslots = dict()
@@ -688,24 +690,30 @@ class CMTSerialiser:
                 end_time,
             )
 
-            # Check if the timeslot is dedicated to a keynote session
-            if timeslot_info["Timeslot name"] in keynotes:
-                keynote = keynotes[timeslot_info["Timeslot name"]]
-                if keynote.presenters is None:
-                    raise Exception(f"[{keynote.id}] The keynote doesn't have speaker")
-                title = ", ".join([p.name for p in keynote.presenters]) + ": " + keynote.title
-                session = KeynoteSession(
-                    keynote.id,
-                    title,
-                    start_time,
-                    end_time,
-                    None,
-                    presentations=[keynote],
-                )
-                list_sessions.append(session)
-                cur_timeslot.add_session(session)
-
             dict_timeslots[timeslot_info["Timeslot name"]] = cur_timeslot
+
+
+        program = Program(list(dict_timeslots.values()), list(dict_rooms.values()))
+
+        # Load the keynotes
+        keynotes = self._load_keynotes(session_summary_file)
+        for keynote_id, keynote in keynotes.items():
+            if keynote.presenters is None:
+                raise Exception(f"[{keynote.id}] The keynote doesn't have speaker")
+            title = ", ".join([p.name for p in keynote.presenters]) + ": " + keynote.title
+            timeslot = dict_timeslots[keynote.id]
+            if timeslot is None:
+                raise Exception("The timeslot should be defined and have the same id than the keynote")
+
+            session = KeynoteSession(
+                keynote.id,
+                title,
+                timeslot.start,
+                timeslot.end,
+                presentations=[keynote],
+            )
+            list_sessions.append(session)
+            # timeslot.add_session(session)
 
 
         # Load additional elements
@@ -723,19 +731,19 @@ class CMTSerialiser:
 
             # Create the sessions
             cur_time_slot = dict_timeslots[session_info["Timeslot name*"]]
-            cur_room = dict_room[session_info["Room name*"]]  # FIXME: why this "*"?
+            cur_room = dict_rooms[session_info["Room name*"]]  # FIXME: why this "*"?
 
             session_type = str(session_info["Session type"])
             if session_type.lower() == "oral":
-                cur_session = OralSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room)
+                cur_session = OralSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             elif session_type.lower() == "poster":
-                cur_session = PosterSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room)
+                cur_session = PosterSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             elif session_type.lower() == "show and tell":
                 cur_session = ShowAndTellSession(
-                    session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room
+                    session_id, session_name, cur_time_slot.start, cur_time_slot.end
                 )
             elif session_type.lower() == "special":
-                cur_session = SpecialSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end, cur_room)
+                cur_session = SpecialSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             else:
                 self._logger.error(
                     f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
@@ -804,7 +812,7 @@ class CMTSerialiser:
                     cur_presentation = survey_talks[paper_id]
                 else:
                     self._logger.error(
-                        f"[{session_id}] {paper_id} is not an available papers, so ignored",
+                        f"[{session_id}] {paper_id} is not an available papers (it could have been withdrawn), so it is ignored",
                         extra={"session_id": session_id, "session_name": session_name},
                     )
                     continue
@@ -814,18 +822,18 @@ class CMTSerialiser:
             self._logger.debug(
                 f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session}
             )
-            cur_time_slot.add_session(cur_session)
+            program.add_session(cur_time_slot, cur_room, cur_session)
             list_sessions.append(cur_session)
 
 
-        return list_sessions, dict_timeslots
+        return list_sessions, program
 
     def load_conference(
         self,
         conference_info_file: pathlib.Path,
-        timeslots: list[Timeslot] | None = None,
+        papers: dict[str, Paper],
+        program: Program | None = None,
         sessions: list[Session] | None = None,
-        papers: dict[str, Paper] | None = None,
     ) -> Conference:
 
         if (sessions is not None) and (papers is not None):
@@ -863,6 +871,9 @@ class CMTSerialiser:
             conf_info["name"],
             conf_info["startDate"],
             conf_info["endDate"],
+            papers,
+            program if (program is not None) else None,
+            sessions if (program is None) and (sessions is not None) else None,
             conf_info["location"] if "location" in conf_info else None,
             conf_info["URL"] if "URL" in conf_info else None,
             conf_info["series"] if "series" in conf_info else None,
@@ -872,15 +883,6 @@ class CMTSerialiser:
             conf_info["theme"] if "theme" in conf_info else None,
             annuary=self._annuary,
         )
-        if timeslots is not None:
-            for timeslot in timeslots:
-                conf.add_timeslot(timeslot)
-        elif sessions is not None:
-            for session in sessions:
-                conf.add_session(session)
-        elif papers is not None:
-            for _, paper in papers.items():
-                conf.add_paper(paper)
 
         return conf
 

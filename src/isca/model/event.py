@@ -3,7 +3,7 @@ import datetime
 
 from .item import ISCAItem, Paper, Session
 from .person import Person, Annuary
-from .program import PresentationSession, Room, Timeslot
+from .program import Program, PresentationSession, Room, Timeslot
 
 
 class Event(ISCAItem):
@@ -33,6 +33,9 @@ class Conference(Event):
         name: str,
         start_date: datetime.date,
         end_date: datetime.date,
+        papers: dict[str, Paper],
+        program: Program | None = None,
+        sessions: list[Session] | None = None,
         location: str | None = None,
         url: str | None = None,
         serie: str | None = None,
@@ -47,9 +50,9 @@ class Conference(Event):
         self.issn: str | None = issn
         self.generate_doi: bool = generate_doi
         self.chairs: list[Person] | None = chairs
-        self._papers: dict[str, Paper] = dict()
-        self._sessions: list[Session] = list()
-        self._timeslots: list[Timeslot] = list()
+        self._papers: dict[str, Paper] = papers
+        self._sessions: list[Session] = sessions if sessions is not None else list()
+        self._program: Program | None = program
         self._authors2papers: dict[Person, list[Paper]] = dict()
         self._annuary: Annuary = copy.copy(annuary) if annuary is not None else Annuary()
 
@@ -72,33 +75,23 @@ class Conference(Event):
     def update_paper(self, paper: Paper):
         self.add_paper(paper, force_replace=True)
 
-    def add_timeslot(self, timeslot: Timeslot):
-        self._timeslots.append(timeslot)
-        if timeslot.sessions is None:
-            return
-
-        for session in timeslot.sessions:
-            self.add_session(session)
+    @property
+    def program(self) -> Program | None:
+        return self._program
 
     def get_timeslots(self, day: datetime.date | None=None) -> list[Timeslot]:
-        if day is None:
-            return self._timeslots
-
-        timeslots = []
-        for timeslot in self._timeslots:
-            if timeslot.start.date() == day:
-                timeslots.append(timeslot)
-
-        return sorted(timeslots, key=lambda x: x.start)
+        assert self._program is not None
+        return self._program.get_timeslots(day)
 
     def add_session(self, session: Session, force_replace: bool = True):
         if (session.id in self._sessions) and (not force_replace):
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
         # If the session is the presentation, need to adds the papers to the overall access
-        for presentation in session.presentations:
-            if presentation.presented_paper is not None:
-                self.add_paper(presentation.presented_paper, force_replace=False)
+        if isinstance(session, PresentationSession):
+            for presentation in session.presentations:
+                if presentation.presented_paper is not None:
+                    self.add_paper(presentation.presented_paper, force_replace=False)
 
         self._sessions.append(session)
         self._sessions = sorted(self._sessions, key=lambda x: x.sort_criterion())  # Sort sessions by starting time
@@ -107,9 +100,10 @@ class Conference(Event):
         if session.id not in self._sessions:
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
-        for presentation in session.presentations:
-            if presentation.presented_paper is not None:
-                self.remove_paper(presentation.presented_paper.id)
+        if isinstance(session, PresentationSession):
+            for presentation in session.presentations:
+                if presentation.presented_paper is not None:
+                    self.remove_paper(presentation.presented_paper.id)
 
         self._sessions.remove(session)
 
@@ -119,28 +113,6 @@ class Conference(Event):
                 if author not in self._authors2papers:
                     self._authors2papers[author] = []
                 self._authors2papers[author].append(paper)
-
-    def associate_sessions_to_rooms(self) -> dict[Room, list[PresentationSession]]:
-        if not self._sessions:
-            raise Exception("The sessions haven't been loaded")
-
-        room_sessions = dict()
-        for cur_session in self._sessions:
-            if not isinstance(cur_session, PresentationSession):
-                continue
-
-            if cur_session.room is None:
-                continue
-
-            if cur_session.room not in room_sessions:
-                room_sessions[cur_session.room] = list()
-
-            room_sessions[cur_session.room].append(cur_session)
-
-        for cur_room, sessions in room_sessions.items():
-            room_sessions[cur_room] = sorted(sessions, key=lambda x: x.start)
-
-        return room_sessions
 
     def list_papers(self, author: Person) -> list[Paper]:
         if (author not in self._authors2papers):

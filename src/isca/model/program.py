@@ -1,6 +1,9 @@
 from enum import Enum
+import copy
 import datetime
+import numpy as np
 
+from .core import ISCAObject
 from .item import ISCAItem, Paper, Session
 from .person import Person
 
@@ -139,21 +142,6 @@ class BlueSkyPresentation(OralPresentation):
 #########################################################################################################
 
 
-class Room(ISCAItem):
-    def __init__(self, id: str, name: str, type: str, capacity: int | tuple[int] | list[int] | None):
-        super().__init__(id)
-        self.name: str = name
-        self.type: str = type
-        self.capacity: int | tuple[int] | list[int] | None = capacity
-
-    def __str__(self) -> str:
-        str = f"{self.name}"
-        if self.capacity is not None:
-            str += f" (capacity={self.capacity})"
-
-        return str + f" [{self.type}]"
-
-
 class PresentationSession(Session):
     def __init__(
         self,
@@ -161,14 +149,12 @@ class PresentationSession(Session):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        room: Room | None = None,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name)
         self._presentations = presentations if presentations is not None else []
         self.chairs = chairs if chairs is not None else []
-        self.room = room
 
         # For now, start/end can't be modified to avoid side effects!
         self._start = start
@@ -219,12 +205,11 @@ class OralSession(PresentationSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        room: Room | None = None,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
         default_presentation_duration: int = 20,
     ):
-        super().__init__(id, name, start, end, room, presentations, chairs)
+        super().__init__(id, name, start, end, presentations, chairs)
         self._default_presentation_duration = default_presentation_duration
 
     def add_presentation(self, presentation: Presentation):
@@ -285,12 +270,11 @@ class KeynoteSession(OralSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        room: Room | None = None,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
         default_presentation_duration: int = 60,
     ):
-        super().__init__(id, name, start, end, room, presentations, chairs, default_presentation_duration)
+        super().__init__(id, name, start, end, presentations, chairs, default_presentation_duration)
 
 
 class PosterSession(PresentationSession):
@@ -300,11 +284,10 @@ class PosterSession(PresentationSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        room: Room | None = None,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
     ):
-        super().__init__(id, name, start, end, room, presentations, chairs)
+        super().__init__(id, name, start, end, presentations, chairs)
 
 
 class SpecialSession(PresentationSession):
@@ -314,11 +297,10 @@ class SpecialSession(PresentationSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        room: Room | None = None,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
     ):
-        super().__init__(id, name, start, end, room, presentations, chairs)
+        super().__init__(id, name, start, end, presentations, chairs)
 
 
 class ShowAndTellSession(PresentationSession):
@@ -328,11 +310,10 @@ class ShowAndTellSession(PresentationSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        room: Room | None = None,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
     ):
-        super().__init__(id, name, start, end, room, presentations, chairs)
+        super().__init__(id, name, start, end, presentations, chairs)
 
 
 #########################################################################################################
@@ -367,14 +348,12 @@ class Timeslot(ISCAItem):
         type: TimeslotType,
         start: datetime.datetime,
         end: datetime.datetime,
-        sessions: list[PresentationSession] | None = None,
     ):
         super().__init__(id)
         self.name: str = name
         self.type: TimeslotType = type
         self.start: datetime.datetime = start
         self.end: datetime.datetime = end
-        self.sessions: list[PresentationSession] | None = sessions
 
     @property
     def date(self) -> datetime.date:
@@ -391,20 +370,157 @@ class Timeslot(ISCAItem):
         end = self.end.strftime("%H:%M")
         return f"{start} -- {end}"
 
-    def add_session(self, session: PresentationSession):
-        if self.sessions is None:
-            self.sessions = list()
-        self.sessions.append(session)
-
-    def get_session_in_room(self, room: Room) -> PresentationSession | None:
-        wanted_session = None
-        if self.sessions is not None:
-            for session in self.sessions:
-                if session.room == room:
-                    wanted_session = session
-                    break
-
-        return wanted_session
-
     def __str__(self) -> str:
         return repr(self)
+
+
+class Room(ISCAItem):
+    def __init__(self, id: str, name: str, type: str, nb_zones: int = 1):
+        super().__init__(id)
+        self.name: str = name
+        self.type: str = type
+        self._nb_zones: int = nb_zones
+
+    @property
+    def nb_zones(self) -> int:
+        return self._nb_zones
+
+    def __str__(self) -> str:
+        str = f"{self.name}"
+        if self.nb_zones is not None:
+            str += f" (nb_zones={self._nb_zones})"
+
+        return str + f" [{self.type}]"
+
+    def __hash__(self) -> int:
+        return hash(self.id)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Room):
+            return False
+
+        return self.id == other.id
+
+class Program(ISCAObject):
+    def __init__(self, timeslots: list[Timeslot], rooms: list[Room]):
+        super().__init__()
+        self._timeslots = sorted(timeslots, key=lambda x: x.start)
+        self._rooms = rooms
+        self._program_matrix = np.full((len(self._timeslots), len(self._rooms)), None)
+
+    def get_timeslots(self, day: datetime.date | None=None) -> list[Timeslot]:
+        if day is None:
+            return self._timeslots
+
+        timeslots = []
+        for timeslot in self._timeslots:
+            if timeslot.start.date() == day:
+                timeslots.append(timeslot)
+
+        return sorted(timeslots, key=lambda x: x.start)
+
+    def get_day_sessions(self, day: datetime.date) -> list[tuple[PresentationSession, Timeslot, Room]]:
+        sessions = []
+        timeslots = self.get_timeslots(day)
+        for timeslot in timeslots:
+            timeslot_idx = self._timeslots.index(timeslot) # NOTE: could be improved to be faster
+            timeslot_content = self._program_matrix[timeslot_idx]
+            for room_idx, room in enumerate(self._rooms):
+                if timeslot_content[room_idx] is not None:
+                    for session in timeslot_content[room_idx]:
+                        sessions.append((session, timeslot, room))
+
+        return sorted(sessions, key=lambda x: x[0].start)
+
+    def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[PresentationSession]]:
+        print(timeslot)
+        sessions = dict()
+        if isinstance(timeslot, Timeslot):
+            timeslot_idx = self._timeslots.index(timeslot) # NOTE: could be improved to be faster
+        else:
+            timeslot_idx = timeslot
+
+        timeslot_content = self._program_matrix[timeslot_idx]
+        for room_idx, room in enumerate(self._rooms):
+            if timeslot_content[room_idx] is not None:
+                sessions[room] = timeslot_content[room_idx]
+
+        return sessions
+
+
+    def get_session(self, timeslot: Timeslot | int, room: Room | int, zone_idx: int = 0):
+        if isinstance(timeslot, int):
+            timeslot_idx = timeslot
+        else:
+            timeslot_idx = self._timeslots.index(timeslot)
+
+        if isinstance(room, int):
+            room_idx = room
+            room = self._rooms[room]
+        else:
+            room_idx = self._rooms.index(room)
+
+        if zone_idx >= room.nb_zones:
+            raise Exception(
+                f'There are not enough zones (nb_zones={room.nb_zones}) in the room as you asked for zone "{zone_idx}"'
+            )
+
+        return self._program_matrix[timeslot_idx, room_idx][zone_idx]
+
+    def add_session(
+        self, timeslot: Timeslot | int, room: Room | int, session: PresentationSession
+    ) -> PresentationSession | None:
+        if isinstance(timeslot, int):
+            timeslot_idx = timeslot
+        else:
+            timeslot_idx = self._timeslots.index(timeslot)
+
+        if isinstance(room, int):
+            room_idx = room
+            room = self._rooms[room]
+        else:
+            room_idx = self._rooms.index(room)
+
+        self._logger.warning(f"Adding session in ({timeslot_idx, room_idx})")
+
+        cur_session = [session]
+        prev_sessions = self._program_matrix[timeslot_idx, room_idx]
+        if prev_sessions is not None:
+            if len(prev_sessions) >= room.nb_zones:
+                raise Exception(
+                    f"There is already a session for the timeslot {timeslot} in the room {room} and replace was not forced. Here is the session: {prev_sessions}"
+                )
+            else:
+                cur_session = prev_sessions.copy()
+                cur_session.append(session)
+
+        self._program_matrix[timeslot_idx, room_idx] = cur_session
+        return prev_sessions
+
+    def remove_session(self, timeslot: Timeslot, room: Room) -> PresentationSession | None:
+        timeslot_idx = self._timeslots.index(timeslot)
+        room_idx = self._rooms.index(room)
+
+        session = self._program_matrix[timeslot_idx, room_idx]
+        self._program_matrix[timeslot_idx, room_idx] = None
+        return session
+
+    def move_session(
+        self, src_timeslot: Timeslot, src_room: Room, dest_timeslot: Timeslot, dest_room: Room
+    ) -> PresentationSession | None:
+        session = self.remove_session(src_timeslot, src_room)
+        if session is None:
+            return None
+        self.add_session(dest_timeslot, dest_room, session)
+
+
+    @property
+    def timeslots(self):
+        return copy.deepcopy(self._timeslots)
+
+    @property
+    def rooms(self):
+        return copy.deepcopy(self._rooms)
+
+    def __str__(self):
+        return str(self._program_matrix)
