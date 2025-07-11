@@ -433,7 +433,6 @@ class Program(ISCAObject):
         return sorted(sessions, key=lambda x: x[0].start)
 
     def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[PresentationSession]]:
-        print(timeslot)
         sessions = dict()
         if isinstance(timeslot, Timeslot):
             timeslot_idx = self._timeslots.index(timeslot) # NOTE: could be improved to be faster
@@ -481,8 +480,6 @@ class Program(ISCAObject):
         else:
             room_idx = self._rooms.index(room)
 
-        self._logger.warning(f"Adding session in ({timeslot_idx, room_idx})")
-
         cur_session = [session]
         prev_sessions = self._program_matrix[timeslot_idx, room_idx]
         if prev_sessions is not None:
@@ -515,12 +512,25 @@ class Program(ISCAObject):
 
 
     @property
-    def timeslots(self):
+    def timeslots(self) -> list[Timeslot]:
         return copy.deepcopy(self._timeslots)
 
     @property
-    def rooms(self):
+    def rooms(self) -> list[Room]:
         return copy.deepcopy(self._rooms)
+
+    @property
+    def sessions(self) -> list[tuple[Timeslot, Room, PresentationSession]]:
+        sessions = []
+        for timeslot_idx, timeslot in enumerate(self._timeslots):
+
+            timeslot_content = self._program_matrix[timeslot_idx]
+            for room_idx, room in enumerate(self._rooms):
+                if timeslot_content[room_idx] is not None:
+                    for session in timeslot_content[room_idx]:
+                        sessions.append((timeslot, room, session))
+
+        return sessions
 
     def __str__(self):
         return str(self._program_matrix)
