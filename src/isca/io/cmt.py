@@ -69,6 +69,18 @@ CMT_AUTHOR_ELTS_REGEXP = re.compile(
 """,
     re.VERBOSE,
 )
+CMT_NEW_PRESENTER_REGEXP = re.compile(
+    r"""
+    ^\s*
+    (.+)
+    \s*
+    \{([^}]+)\}
+    \s*
+    <([^ ]+)>
+    \s*$
+    """,
+    re.VERBOSE,
+)
 CMT_AFFILIATION_REGEXP = re.compile(
     r"""
     ^\s*
@@ -93,6 +105,7 @@ class CMTSerialiser:
 
     def _extract_df_information(self, paper_info: pd.Series) -> tuple[Paper, list[Person] | None]:
 
+        paper_id = paper_info['Paper ID']
         author_names = (
             str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
         )
@@ -101,10 +114,10 @@ class CMTSerialiser:
         # The number of elements should be the same
         if len(author_emails) != len(author_names):
             names = "\n".join(author_names)
-            self._logger.error(f"[{paper_info['Paper ID']}] author names = {names}")
-            self._logger.error(f"[{paper_info['Paper ID']}] author emails = {author_emails}")
+            self._logger.error(f"[{paper_id}] author names = {names}")
+            self._logger.error(f"[{paper_id}] author emails = {author_emails}")
             raise Exception(
-                f"[{paper_info['Paper ID']}] The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
+                f"[{paper_id}] The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
             )
 
         paper_authors = list()
@@ -116,7 +129,7 @@ class CMTSerialiser:
             match_author_affiliations = CMT_AUTHOR_FULL_INFO_REGEXP.match(cur_author)
             if not match_author_affiliations:
                 raise Exception(
-                    f"[{paper_info['Paper ID']}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
+                    f"[{paper_id}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
                 )
 
             # Extract author information
@@ -131,7 +144,7 @@ class CMTSerialiser:
                     last_name = match_author.group(3)
                 else:
                     raise Exception(
-                        f"[{paper_info['Paper ID']}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
+                        f"[{paper_id}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
                     )
             else:
                 author_elts = cur_author.split(" ")
@@ -148,7 +161,7 @@ class CMTSerialiser:
                 match_affiliation = CMT_AFFILIATION_REGEXP.match(f)
                 if not match_affiliation:
                     raise Exception(
-                        f"[{paper_info['Paper ID']}] The following affiliation for author {cur_author} is not valid: {f}"
+                        f"[{paper_id}] The following affiliation for author {cur_author} is not valid: {f}"
                     )
 
                 country = None
@@ -168,7 +181,7 @@ class CMTSerialiser:
             #     candidates = self._annuary.find_person_by_name(first_name, last_name, middle_initial)
             #     if len(candidates) > 0:
             #         if len(candidates) > 1:
-            #             raise Exception(f"[{paper_info['Paper ID']}] Too many candidates for {first_name} {'[' + middle_initial + ']' if middle_initial is not None else ''} {last_name}")
+            #             raise Exception(f"[{paper_id}] Too many candidates for {first_name} {'[' + middle_initial + ']' if middle_initial is not None else ''} {last_name}")
             #         cur_person = list(candidates)[0]
 
             if cur_person is None:
@@ -182,6 +195,9 @@ class CMTSerialiser:
 
             else:
                 cur_person.add_role(Role.AUTHOR)
+                if cur_person.firstname != first_name:
+                    self._logger.debug(f"[{paper_id}] Change the name of {email} from {cur_person.name} to {first_name} {last_name}")
+
                 # NOTE: The information from the PDF are likely more reliable
                 cur_person.firstname = first_name
                 cur_person.lastname = last_name
@@ -193,19 +209,38 @@ class CMTSerialiser:
 
         # Extract presenters (TODO: This is a bit too specific, will have to check with Antoine about this)
         presenters = None
-        if "Q7 (Presenter - Value)" in paper_info:
+        if ("Q7 (New presenter)" in paper_info) and (not pd.isna(paper_info["Q7 (New presenter)"])):
+            m = CMT_NEW_PRESENTER_REGEXP.match(paper_info["Q7 (New presenter)"])
+            if m:
+                self._logger.error(f"Adding alternative presenter \"{paper_info['Q7 (New presenter)']}\" to paper {paper_id}")
+                pres_firstname = m.group(1)
+                pres_lastname = m.group(2)
+                pres_email = m.group(3).lower().strip()
+
+                cur_presenter = self._annuary.find_person_by_email(pres_email)
+                if cur_presenter is None:
+                    # FIXME: force unknwon affiliation
+                    cur_presenter = Person(pres_firstname, pres_lastname, Affiliation("Unknown"), pres_email)
+                    self._annuary.add(cur_presenter)
+
+                cur_presenter.add_role(Role.PRESENTER)
+                presenters = [cur_presenter]
+            else:
+                raise Exception(f"The presenter \"{paper_info['Q7 (New presenter)']}\" does nor respect the format")
+
+        elif "Q7 (Presenter - Value)" in paper_info:
             presenter_idx = int(paper_info["Q7 (Presenter - Value)"]) - 1
 
             if presenter_idx >= len(paper_authors):
                 raise IndexError(
-                    f"[{paper_info['Paper ID']}] Author {presenter_idx} can't be a presenter as there are only {len(paper_authors)} authors"
+                    f"[{paper_id}] Author {presenter_idx} can't be a presenter as there are only {len(paper_authors)} authors"
                 )
             cur_presenter = paper_authors[presenter_idx]
             cur_presenter.add_role(Role.PRESENTER)
             presenters = [cur_presenter]
         else:
             self._logger.debug(
-                f"[{paper_info['Paper ID']}] doesn't have a presenter",
+                f"[{paper_id}] doesn't have a presenter",
                 extra={"paper_id": str(paper_info["Paper ID"]), "paper_serie": paper_info},
             )
 
@@ -314,9 +349,13 @@ class CMTSerialiser:
                 else:
                     last_name = str(user_row["Last Name"])
 
+                country = None
+                if not pd.isna(user_row["Country"]):
+                    country = str(user_row["Country"]).strip()
+
                 affiliation = Affiliation(
                     institute=str(user_row["Organization"]).strip(),
-                    country=str(user_row["Country"]).strip(),
+                    country=country,
                 )
 
                 roles = set()
