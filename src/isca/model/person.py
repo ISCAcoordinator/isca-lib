@@ -141,7 +141,9 @@ class Person:
         self.firstname: str | None = firstname
         self.lastname: str = lastname
         self.default_affiliation: Affiliation = default_affiliation
-        self.middle_initial: str | None = middle_initial
+        self.middle_initial: str | None = (
+            middle_initial if (middle_initial is not None) and middle_initial.strip() else None
+        )
         self._roles: set[Role] = roles
         self.email: str | None = email
         self.paper_affiliations: dict[str, list[Affiliation]] = (
@@ -149,43 +151,6 @@ class Person:
         )
         self.biography: str | None = biography
         self._id: str = self._generate_id() if id is None else id
-
-    def get_organization(self, paper_id: int = -1) -> str:
-        """Helper to get the organisation of the user
-
-        The organisation could be paper specific. Therefore, one user can have multiple organisations.
-        Parameters
-        ----------
-        self: type
-            description
-        paper_id: int
-            The paper identifier. If -1, then use the default organisation
-
-        Returns
-        -------
-        str:
-            The organisation
-        """
-        raise NotImplementedError("This method is not yet implemented")
-
-    def str_with_organization(self, paper_id: int = -1) -> str:
-        """Get string version of the user with its organisation.
-
-        A user can have multiple organisations, so the paper ID can be used to specify the organisation of which paper is needed.
-
-        Parameters
-        ----------
-        self: type
-            description
-        paper_id: int
-            The paper identifiier. If -1, then use the default organisation
-
-        Returns
-        -------
-        str
-            The string version of the User including its organisation
-        """
-        raise NotImplementedError("This method is not yet implemented")
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -267,10 +232,6 @@ class Person:
         s = unidecode(s.lower())
         return s
 
-    def _generate_id(self) -> str:
-        Person._counter += 1
-        return str(Person._counter)
-
     def str_with_flatten_affiliations(self, paper_id: str, short=False, markers=True) -> str:
         if markers:
             str_person = self.isca_name
@@ -280,13 +241,19 @@ class Person:
         affiliations = []
         if paper_id not in self.paper_affiliations:
             if short:
-                affiliations.append(self.default_affiliation.institute)
+                aff = self.default_affiliation.institute
+                if self.default_affiliation.country is not None:
+                    aff += f", {{{self.default_affiliation.country}}}"
+                affiliations.append(aff)
             else:
                 affiliations.append(str(self.default_affiliation))
         else:
             for affiliation in self.paper_affiliations[paper_id]:
                 if short:
-                    affiliation = affiliation.institute
+                    aff = affiliation.institute
+                    if affiliation.country is not None:
+                        aff += f", {{{affiliation.country}}}"
+                    affiliation = aff
                 else:
                     affiliation = str(affiliation)
                 affiliations.append(affiliation)
@@ -299,10 +266,13 @@ class Person:
             self.paper_affiliations[paper_id] = list()
         self.paper_affiliations[paper_id].append(affiliation)
 
-
     @property
     def id(self) -> str:
         return self._id
+
+    def _generate_id(self) -> str:
+        Person._counter += 1
+        return str(Person._counter)
 
     def __hash__(self) -> int:
         """Hashing method which hashes the email to identify the user
@@ -365,6 +335,7 @@ class Annuary:
     def add(self, person: Person):
         if (person.email is not None) and (self.find_person_by_email(person.email) is not None):
             return
+
         if person not in self._annuary:
             self._annuary.add(person)
 
@@ -380,10 +351,7 @@ class Annuary:
             return None
         return self._email_annuary[email]
 
-    def find_person_by_id(self, id: str) -> Person | None:
-        raise NotImplementedError("This method is not yet implemented")
-
-    def find_person_by_name(self, firstname: str, lastname: str, middle_initial: str | None=None) -> set[Person]:
+    def find_person_by_name(self, firstname: str, lastname: str, middle_initial: str | None = None) -> set[Person]:
         set_person = set()
         for person in self._annuary:
             if (person.firstname != firstname) or (person.lastname != lastname):
