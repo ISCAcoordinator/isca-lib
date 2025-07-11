@@ -15,7 +15,7 @@ class Event(ISCAItem):
         end_date: datetime.date,
         location: str | None = None,
         url: str | None = None,
-        theme: dict[str, object] | None = None
+        theme: dict[str, object] | None = None,
     ):
         super().__init__(id)
         self.name: str = name
@@ -43,7 +43,7 @@ class Conference(Event):
         issn: str | None = None,
         generate_doi: bool = False,
         theme: dict[str, object] | None = None,
-        annuary: Annuary | None = None
+        annuary: Annuary | None = None,
     ):
         super().__init__(id, name, start_date, end_date, location, url, theme)
         self.serie: str | None = serie
@@ -79,11 +79,16 @@ class Conference(Event):
     def program(self) -> Program | None:
         return self._program
 
-    def get_timeslots(self, day: datetime.date | None=None) -> list[Timeslot]:
+    def get_timeslots(self, day: datetime.date | None = None) -> list[Timeslot]:
         assert self._program is not None
         return self._program.get_timeslots(day)
 
     def add_session(self, session: Session, force_replace: bool = True):
+        if self._program is not None:
+            raise NotImplementedError(
+                "The conference has a proper program (accessible through the property program), do not use the current method"
+            )
+
         if (session.id in self._sessions) and (not force_replace):
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
@@ -97,6 +102,11 @@ class Conference(Event):
         self._sessions = sorted(self._sessions, key=lambda x: x.sort_criterion())  # Sort sessions by starting time
 
     def remove_session(self, session: Session):
+        if self._program is not None:
+            raise NotImplementedError(
+                "The conference has a proper program (accessible through the property program), do not use the current method"
+            )
+
         if session.id not in self._sessions:
             raise ValueError(f'The session "{session.id}" is already part of the conference')
 
@@ -115,7 +125,7 @@ class Conference(Event):
                 self._authors2papers[author].append(paper)
 
     def list_papers(self, author: Person) -> list[Paper]:
-        if (author not in self._authors2papers):
+        if author not in self._authors2papers:
             return []
 
         return self._authors2papers[author]
@@ -141,7 +151,10 @@ class Conference(Event):
 
     @property
     def sessions(self) -> list[Session]:
-        return self._sessions.copy()
+        if self._program is not None:
+            return [s[2] for s in self._program.sessions]
+        else:
+            return self._sessions.copy()
 
     @property
     def rooms(self) -> set[Room]:
