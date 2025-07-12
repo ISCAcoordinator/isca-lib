@@ -255,16 +255,16 @@ class ArchiveInputSerialiser:
 
         return conf
 
-    def dump(self, conf: Conference, metadata_file: pathlib.Path):
+    def dump(self, conf: Conference, output_dir: pathlib.Path):
 
         # Prepare directory
-        abstracts_dir = metadata_file.parent / "abstracts"
+        abstracts_dir = output_dir / "abstracts"
         abstracts_dir.mkdir(exist_ok=True, parents=True)
-        pdfs_dir = metadata_file.parent / "pdfs"
+        pdfs_dir = output_dir / "pdfs"
         pdfs_dir.mkdir(exist_ok=True, parents=True)
 
         # Create paper file
-        with open(metadata_file.parent / "papers.txt", "w") as f_papers:
+        with open(output_dir / "papers.txt", "w") as f_papers:
             f_papers.write(ARCHIVE_INPUT_DATA_SEP.join(["id", "title", "authors"]))
             f_papers.write("\n")
 
@@ -299,7 +299,7 @@ class ArchiveInputSerialiser:
                     shutil.copy(paper.pdf_file.resolve(), pdfs_dir / f"{paper_id}.pdf")
 
         # Create session file
-        with open(metadata_file.parent / "sessions.txt", "w") as f_sessions:
+        with open(output_dir / "sessions.txt", "w") as f_sessions:
             f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
             f_sessions.write("\n")
 
@@ -333,7 +333,7 @@ class ArchiveInputSerialiser:
         if conf.serie is not None:
             dict_out["series"] = conf.serie
 
-        with open(metadata_file, "w") as f_conf:
+        with open(output_dir / "conference.txt", "w") as f_conf:
             for k, v in dict_out.items():
                 f_conf.write(f" {ARCHIVE_CONF_SEPARATOR} ".join([k, v]))
                 f_conf.write("\n")
