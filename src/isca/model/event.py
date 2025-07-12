@@ -157,12 +157,10 @@ class Conference(Event):
             return self._sessions.copy()
 
     @property
-    def rooms(self) -> set[Room]:
-        rooms = set()
-        for cur_session in self.sessions:
-            if isinstance(cur_session, PresentationSession):
-                rooms.add(cur_session.room)
-        return rooms
+    def rooms(self) -> list[Room]:
+        if self._program is None:
+            raise Exception("The program is not defined, so we can't access to the rooms")
+        return self._program.rooms
 
     def __repr__(self) -> str:
         return f"Conference({self.name}, start={self.start_date}, end={self.end_date}, chairs={self.chairs}, nb_papers={len(self.papers.keys())}, nb_sessions={len(self.sessions)})"
