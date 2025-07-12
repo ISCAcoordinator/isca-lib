@@ -35,13 +35,23 @@ class Affiliation:
         self.country: str | None = country
         self.institute: str = institute
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         list_elts = []
         if self.department is not None:
             list_elts.append("[" + self.department + "]")
         list_elts.append(self.institute)
         if self.country is not None:
             list_elts.append("{" + self.country + "}")
+
+        return ", ".join(list_elts)
+
+    def __str__(self) -> str:
+        list_elts = []
+        if self.department is not None:
+            list_elts.append(self.department)
+        list_elts.append(self.institute)
+        if self.country is not None:
+            list_elts.append(self.country)
 
         return ", ".join(list_elts)
 
@@ -226,7 +236,7 @@ class Person:
         s = unidecode(s.lower())
         return s
 
-    def str_with_flatten_affiliations(self, paper_id: str | None = None, short=False, markers=True) -> str:
+    def str_with_flatten_affiliations(self, paper_id: str | None = None, short=False, markers=False) -> str:
         if markers:
             str_person = self.isca_name
         else:
@@ -237,8 +247,13 @@ class Person:
             if short:
                 aff = self.default_affiliation.institute
                 if self.default_affiliation.country is not None:
-                    aff += f", {{{self.default_affiliation.country}}}"
+                    if markers:
+                        aff += f", {{{self.default_affiliation.country}}}"
+                    else:
+                        aff += f", {self.default_affiliation.country}"
                 affiliations.append(aff)
+            elif markers:
+                affiliations.append(repr(self.default_affiliation))
             else:
                 affiliations.append(str(self.default_affiliation))
         else:
@@ -246,8 +261,13 @@ class Person:
                 if short:
                     aff = affiliation.institute
                     if affiliation.country is not None:
-                        aff += f", {{{affiliation.country}}}"
+                        if markers:
+                            aff += f", {{{affiliation.country}}}"
+                        else:
+                            aff += f", {affiliation.country}"
                     affiliation = aff
+                elif markers:
+                    affiliation = repr(affiliation)
                 else:
                     affiliation = str(affiliation)
                 affiliations.append(affiliation)
