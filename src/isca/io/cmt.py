@@ -742,6 +742,12 @@ class CMTSerialiser:
             session_id = str(session_info["Session name"])
             session_name = str(session_info["Session title"])
 
+            # FIXME: Sorting and shortening is hardcoded, this should be done somewhere else
+            session_id = re.sub(r"Area([0-9])-", r"Area0\1-", session_id)
+            shorten = {"Area": "A", "Oral": "O", "Poster": "P", "ShowAndTell": "ST"}
+            for s, v in shorten.items():
+                session_id = session_id.replace(s, v)
+
             # Create the sessions
             cur_time_slot = dict_timeslots[session_info["Timeslot name*"]]
             cur_room = dict_rooms[session_info["Room name*"]]  # FIXME: why this "*"?
@@ -775,7 +781,7 @@ class CMTSerialiser:
                     if isinstance(cur_session, OralSession):
                         if paper_id in bs_paper_ids:
                             cur_presentation = BlueSkyPresentation(
-                                f"{session_id}-{paper_idx}",
+                                f"{session_id}-{paper_idx:02d}",
                                 cur_paper.title,
                                 paper_presenters,
                                 40,  # TODO: the duration is hardcoded
@@ -784,7 +790,7 @@ class CMTSerialiser:
                             )
                         else:
                             cur_presentation = OralPresentation(
-                                f"{session_id}-{paper_idx}",
+                                f"{session_id}-{paper_idx:02d}",
                                 cur_paper.title,
                                 paper_presenters,
                                 cur_session.default_duration,
@@ -793,7 +799,7 @@ class CMTSerialiser:
                             )
                     elif isinstance(cur_session, PosterSession):
                         cur_presentation = PosterPresentation(
-                            f"{session_id}-{paper_idx}",
+                            f"{session_id}-{paper_idx:02d}",
                             cur_paper.title,
                             paper_presenters,
                             cur_paper.abstract,
@@ -801,7 +807,7 @@ class CMTSerialiser:
                         )
                     elif isinstance(cur_session, ShowAndTellSession):
                         cur_presentation = ShowAndTellPresentation(
-                            f"{session_id}-{paper_idx}",
+                            f"{session_id}-{paper_idx:02d}",
                             cur_paper.title,
                             paper_presenters,
                             cur_paper.abstract,
@@ -809,7 +815,7 @@ class CMTSerialiser:
                         )
                     elif isinstance(cur_session, SpecialSession):
                         cur_presentation = SpecialPresentation(
-                            f"{session_id}-{paper_idx}",
+                            f"{session_id}-{paper_idx:02d}",
                             cur_paper.title,
                             paper_presenters,
                             cur_paper.abstract,
