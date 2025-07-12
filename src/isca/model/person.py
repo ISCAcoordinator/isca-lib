@@ -288,7 +288,19 @@ class Person:
         return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
 
     def __str__(self) -> str:
-        return self.str_with_flatten_affiliations(markers=False)
+        last_name = self.lastname
+        if " " in last_name:
+            last_name = f"{{{last_name}}}"
+
+        if not self.firstname:
+            return last_name
+
+        if self.middle_initial is not None:
+            user_str = f"{self.firstname} {self.middle_initial} {last_name}"
+        else:
+            user_str = f"{self.firstname} {last_name}"
+
+        return user_str
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Person):
