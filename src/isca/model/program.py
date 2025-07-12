@@ -532,5 +532,20 @@ class Program(ISCAObject):
 
         return sessions
 
+    def authors2presentations(self) -> dict[Person, list[Presentation]]:
+        authors2presentations = dict()
+        sessions = self.sessions
+        for session_info in sessions:
+            _, _, session = session_info
+            for presentation in session.presentations:
+                if presentation.presented_paper is None:
+                    continue
+
+                for author in presentation.presented_paper.authors:
+                    if author not in authors2presentations:
+                        authors2presentations[author] = list()
+                    authors2presentations[author].append(presentation)
+        return authors2presentations
+
     def __str__(self):
         return str(self._program_matrix)
