@@ -140,13 +140,14 @@ class PublishedPaper(Paper):
 
 
 class Session(ISCAItem):
-    def __init__(
-        self,
-        id: str,
-        name: str,
-    ):
+    def __init__(self, id: str, name: str, papers: list[Paper] | None = []):
         super().__init__(id)
         self.name = name
+        self._papers: list[Paper] = papers if papers is not None else []
+
+    @property
+    def papers(self) -> list[Paper]:
+        return self._papers
 
     def sort_criterion(self) -> str:
         return self.id
