@@ -322,6 +322,7 @@ class CMTSerialiser:
 
             for _, user_row in df.iterrows():
                 first_name = str(user_row["# First Name"]).strip()
+                first_name = first_name.title() if first_name.isupper() else first_name
 
                 middle_initial = ""
                 if not pd.isna(user_row["Middle Initial (optional)"]):
@@ -329,10 +330,11 @@ class CMTSerialiser:
 
                 if pd.isna(user_row["Last Name"]) or (str(user_row["Last Name"]) == ""):
                     last_name = first_name.strip()
-                    first_name = ""
+                    first_name = None
                 else:
                     last_name = str(user_row["Last Name"])
 
+                last_name = last_name.title() if last_name.isupper() else last_name
                 country = None
                 if not pd.isna(user_row["Country"]):
                     country = str(user_row["Country"]).strip()
