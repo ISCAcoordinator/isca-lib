@@ -48,7 +48,7 @@ class Paper(ISCAItem):
         alternative_affiliations: dict[Person, Affiliation] | None = None,
         track: str | None = None,
         metadata_from_pdf: bool = False,
-        resource: str | None = None
+        resource: str | None = None,
     ):
         """Initialisation method
 
@@ -137,6 +137,7 @@ class PublishedPaper(Paper):
         self.doi: str | None = doi
         self.author_area_id: str | None = author_area_id
         self.author_area_label: str | None = author_area_label
+
 
 class Session(ISCAItem):
     def __init__(

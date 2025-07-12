@@ -105,10 +105,8 @@ class CMTSerialiser:
 
     def _extract_df_information(self, paper_info: pd.Series) -> tuple[Paper, list[Person] | None]:
 
-        paper_id = paper_info['Paper ID']
-        author_names = (
-            str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
-        )
+        paper_id = paper_info["Paper ID"]
+        author_names = str(paper_info["Author Names"]).replace(CMT_CORRESPONDING_MARKER, "").split(CMT_AUTHOR_NAME_AFF_SEP)
         author_emails = [email.lower().strip() for email in str(paper_info["Author Emails"]).split(CMT_AUTHOR_SEP)]
 
         # The number of elements should be the same
@@ -128,9 +126,7 @@ class CMTSerialiser:
 
             match_author_affiliations = CMT_AUTHOR_FULL_INFO_REGEXP.match(cur_author)
             if not match_author_affiliations:
-                raise Exception(
-                    f"[{paper_id}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
-                )
+                raise Exception(f"[{paper_id}] Impossible to parse the author, please fix the spreadsheet: {cur_author}")
 
             # Extract author information
             middle_initial = None
@@ -143,14 +139,10 @@ class CMTSerialiser:
                     middle_initial = match_author.group(2)
                     last_name = match_author.group(3)
                 else:
-                    raise Exception(
-                        f"[{paper_id}] Impossible to parse the author, please fix the spreadsheet: {cur_author}"
-                    )
+                    raise Exception(f"[{paper_id}] Impossible to parse the author, please fix the spreadsheet: {cur_author}")
             else:
                 author_elts = cur_author.split(" ")
-                author_elts = list(
-                    filter(None, author_elts)
-                )  # NOTE: helpers to ignore empty elements due to multiple space
+                author_elts = list(filter(None, author_elts))  # NOTE: helpers to ignore empty elements due to multiple space
                 last_name = author_elts[-1]
                 first_name = " ".join(author_elts[:-1])
 
@@ -160,9 +152,7 @@ class CMTSerialiser:
             for f in affiliations:
                 match_affiliation = CMT_AFFILIATION_REGEXP.match(f)
                 if not match_affiliation:
-                    raise Exception(
-                        f"[{paper_id}] The following affiliation for author {cur_author} is not valid: {f}"
-                    )
+                    raise Exception(f"[{paper_id}] The following affiliation for author {cur_author} is not valid: {f}")
 
                 country = None
                 if len(match_affiliation.groups()) > 2:
@@ -195,7 +185,9 @@ class CMTSerialiser:
             else:
                 cur_person.add_role(Role.AUTHOR)
                 if cur_person.firstname != first_name:
-                    self._logger.debug(f"[{paper_id}] Change the name of {email} from {cur_person.name} to {first_name} {last_name}")
+                    self._logger.debug(
+                        f"[{paper_id}] Change the name of {email} from {cur_person.name} to {first_name} {last_name}"
+                    )
 
                 # NOTE: The information from the PDF are likely more reliable
                 cur_person.firstname = first_name
@@ -259,19 +251,13 @@ class CMTSerialiser:
         if "Q3 (Link to resource (optional))" in paper_info:
             resource = str(paper_info["Q3 (Link to resource (optional))"])
             if not resource.startswith("https://doi.org/"):
-               if resource.startswith("10."): # FIXME: hardcoded number prefix
-                   resource = "https://doi.org/" + resource
-               else:
-                   resource = None
+                if resource.startswith("10."):  # FIXME: hardcoded number prefix
+                    resource = "https://doi.org/" + resource
+                else:
+                    resource = None
 
         return (
-            Paper(
-                str(paper_info["Paper ID"]),
-                title,
-                paper_authors,
-                abstract=abstract,
-                resource=resource
-            ),
+            Paper(str(paper_info["Paper ID"]), title, paper_authors, abstract=abstract, resource=resource),
             presenters,
         )
 
@@ -503,9 +489,7 @@ class CMTSerialiser:
                     paper_id = str(paper_id)
                     pdf_path = paper_root_dir / f"{paper_id}.pdf"
 
-                    if (updated_paper_root_dir is not None) and (
-                        updated_paper_root_dir / f"{paper_id}.pdf"
-                    ).exists():
+                    if (updated_paper_root_dir is not None) and (updated_paper_root_dir / f"{paper_id}.pdf").exists():
                         self._logger.debug(
                             f"[{paper_id}] using the updated PDF",
                             extra={
@@ -516,25 +500,25 @@ class CMTSerialiser:
 
                 if self.metadata_from_pdf:
                     try:
-                            if (pdf_path is not None) and pdf_path.exists():
-                                title, authors = load_pdf_information(pdf_path)
-                                cur_paper.title = title
-                                cur_paper.authors = authors  # TODO: for now it is not linked to any email
+                        if (pdf_path is not None) and pdf_path.exists():
+                            title, authors = load_pdf_information(pdf_path)
+                            cur_paper.title = title
+                            cur_paper.authors = authors  # TODO: for now it is not linked to any email
 
-                                self._logger.debug(
-                                    f"[{paper_id}] Metadata extracted from the PDF {pdf_path}",
-                                    extra={
-                                        "paper_id": paper_id,
-                                        "metadata_from_pdf": True,
-                                        "source": pdf_path,
-                                    },
-                                )
-                            else:
-                                self._logger.warning(
-                                    f"[{paper_id}] No PDF attached",
-                                    extra={"paper_id": paper_id},
-                                )
-                                no_pdf += 1
+                            self._logger.debug(
+                                f"[{paper_id}] Metadata extracted from the PDF {pdf_path}",
+                                extra={
+                                    "paper_id": paper_id,
+                                    "metadata_from_pdf": True,
+                                    "source": pdf_path,
+                                },
+                            )
+                        else:
+                            self._logger.warning(
+                                f"[{paper_id}] No PDF attached",
+                                extra={"paper_id": paper_id},
+                            )
+                            no_pdf += 1
 
                     except WordException:
                         self._logger.warning(
@@ -614,11 +598,7 @@ class CMTSerialiser:
             speaker.biography = row["Bio"]
 
             keynote = Keynote(
-                row["Keynote ID"],
-                row["Paper Title"],
-                [speaker], # FIXME: duration is hardcoded
-                60,
-                row["Abstract"]
+                row["Keynote ID"], row["Paper Title"], [speaker], 60, row["Abstract"]  # FIXME: duration is hardcoded
             )
 
             keynotes[keynote.id] = keynote
@@ -640,9 +620,7 @@ class CMTSerialiser:
                 first_name = str(survey_talk["First Name"]).strip()
 
                 middle_initial = ""
-                if ("Middle Initial (optional)" in survey_talk) and (
-                    not pd.isna(survey_talk["Middle Initial (optional)"])
-                ):
+                if ("Middle Initial (optional)" in survey_talk) and (not pd.isna(survey_talk["Middle Initial (optional)"])):
                     middle_initial = str(survey_talk["Middle Initial (optional)"]).strip()
 
                 if pd.isna(survey_talk["Last Name"]) or (str(survey_talk["Last Name"]) == ""):
@@ -729,7 +707,6 @@ class CMTSerialiser:
 
             dict_timeslots[timeslot_info["Timeslot name"]] = cur_timeslot
 
-
         program = Program(list(dict_timeslots.values()), list(dict_rooms.values()))
 
         # Load the keynotes
@@ -751,7 +728,6 @@ class CMTSerialiser:
             )
             list_sessions.append(session)
             # timeslot.add_session(session)
-
 
         # Load additional elements
         survey_talks = self._load_survey_talks(session_summary_file)
@@ -776,9 +752,7 @@ class CMTSerialiser:
             elif session_type.lower() == "poster":
                 cur_session = PosterSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             elif session_type.lower() == "show and tell":
-                cur_session = ShowAndTellSession(
-                    session_id, session_name, cur_time_slot.start, cur_time_slot.end
-                )
+                cur_session = ShowAndTellSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             elif session_type.lower() == "special":
                 cur_session = SpecialSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             else:
@@ -789,9 +763,7 @@ class CMTSerialiser:
                 continue
 
             # Now deal add the papers
-            session_paper_ids = [
-                str(id).strip() for id in str(session_info["Papers"]).split(CMT_SESSION_PAPER_SEPARATOR)
-            ]
+            session_paper_ids = [str(id).strip() for id in str(session_info["Papers"]).split(CMT_SESSION_PAPER_SEPARATOR)]
             for paper_idx, paper_id in enumerate(session_paper_ids, 1):
                 if paper_id in dict_papers:
 
@@ -856,12 +828,9 @@ class CMTSerialiser:
 
                 cur_session.add_presentation(cur_presentation)
 
-            self._logger.debug(
-                f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session}
-            )
+            self._logger.debug(f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session})
             program.add_session(cur_time_slot, cur_room, cur_session)
             list_sessions.append(cur_session)
-
 
         return list_sessions, program
 

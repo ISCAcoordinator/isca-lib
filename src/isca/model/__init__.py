@@ -1,6 +1,7 @@
 from .person import Person
 from .event import Conference
 
+
 class ISCADataBase:
     def __init__(self):
         self.conferences: dict[str, Conference] = {}

@@ -401,6 +401,7 @@ class Room(ISCAItem):
 
         return self.id == other.id
 
+
 class Program(ISCAObject):
     def __init__(self, timeslots: list[Timeslot], rooms: list[Room]):
         super().__init__()
@@ -408,7 +409,7 @@ class Program(ISCAObject):
         self._rooms = rooms
         self._program_matrix = np.full((len(self._timeslots), len(self._rooms)), None)
 
-    def get_timeslots(self, day: datetime.date | None=None) -> list[Timeslot]:
+    def get_timeslots(self, day: datetime.date | None = None) -> list[Timeslot]:
         if day is None:
             return self._timeslots
 
@@ -423,7 +424,7 @@ class Program(ISCAObject):
         sessions = []
         timeslots = self.get_timeslots(day)
         for timeslot in timeslots:
-            timeslot_idx = self._timeslots.index(timeslot) # NOTE: could be improved to be faster
+            timeslot_idx = self._timeslots.index(timeslot)  # NOTE: could be improved to be faster
             timeslot_content = self._program_matrix[timeslot_idx]
             for room_idx, room in enumerate(self._rooms):
                 if timeslot_content[room_idx] is not None:
@@ -435,7 +436,7 @@ class Program(ISCAObject):
     def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[PresentationSession]]:
         sessions = dict()
         if isinstance(timeslot, Timeslot):
-            timeslot_idx = self._timeslots.index(timeslot) # NOTE: could be improved to be faster
+            timeslot_idx = self._timeslots.index(timeslot)  # NOTE: could be improved to be faster
         else:
             timeslot_idx = timeslot
 
@@ -445,7 +446,6 @@ class Program(ISCAObject):
                 sessions[room] = timeslot_content[room_idx]
 
         return sessions
-
 
     def get_session(self, timeslot: Timeslot | int, room: Room | int, zone_idx: int = 0):
         if isinstance(timeslot, int):
@@ -466,9 +466,7 @@ class Program(ISCAObject):
 
         return self._program_matrix[timeslot_idx, room_idx][zone_idx]
 
-    def add_session(
-        self, timeslot: Timeslot | int, room: Room | int, session: PresentationSession
-    ) -> PresentationSession | None:
+    def add_session(self, timeslot: Timeslot | int, room: Room | int, session: PresentationSession) -> PresentationSession | None:
         if isinstance(timeslot, int):
             timeslot_idx = timeslot
         else:
@@ -509,7 +507,6 @@ class Program(ISCAObject):
         if session is None:
             return None
         self.add_session(dest_timeslot, dest_room, session)
-
 
     @property
     def timeslots(self) -> list[Timeslot]:

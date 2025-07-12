@@ -52,9 +52,7 @@ class Affiliation:
         return pd.Series({"departement": self.department, "institute": self.institute, "country": self.country})
 
     @classmethod
-    def from_serie(
-        cls, serie: pd.Series
-    ) -> "Affiliation":  # NOTE: typing return is a string until we move toward python 3.14
+    def from_serie(cls, serie: pd.Series) -> "Affiliation":  # NOTE: typing return is a string until we move toward python 3.14
         department = str(serie["department"]) if "department" in serie else None
         institute = str(serie["institute"])
         country = str(serie["country"]) if "country" in serie else None
@@ -141,14 +139,10 @@ class Person:
         self.firstname: str | None = firstname
         self.lastname: str = lastname
         self.default_affiliation: Affiliation = default_affiliation
-        self.middle_initial: str | None = (
-            middle_initial if (middle_initial is not None) and middle_initial.strip() else None
-        )
+        self.middle_initial: str | None = middle_initial if (middle_initial is not None) and middle_initial.strip() else None
         self._roles: set[Role] = roles
         self.email: str | None = email
-        self.paper_affiliations: dict[str, list[Affiliation]] = (
-            paper_affiliations if paper_affiliations is not None else dict()
-        )
+        self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
         self.biography: str | None = biography
         self._id: str = self._generate_id() if id is None else id
 
@@ -232,7 +226,7 @@ class Person:
         s = unidecode(s.lower())
         return s
 
-    def str_with_flatten_affiliations(self, paper_id: str|None=None, short=False, markers=True) -> str:
+    def str_with_flatten_affiliations(self, paper_id: str | None = None, short=False, markers=True) -> str:
         if markers:
             str_person = self.isca_name
         else:

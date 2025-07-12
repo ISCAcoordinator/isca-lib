@@ -42,7 +42,7 @@ class PublishedArchiveSerialiser:
         for paper_id, paper in metadata["papers"].items():
             authors = []
             for author in paper["authors"]:
-                email = f'{".".join(author)}@none.org' # FIXME: email issue here!
+                email = f'{".".join(author)}@none.org'  # FIXME: email issue here!
                 authors.append(Person(author[0], author[1], email, set([Role.AUTHOR])))
 
             cur_paper = PublishedPaper(
@@ -50,7 +50,7 @@ class PublishedArchiveSerialiser:
                 paper["title"],
                 authors,
                 paper["abstract"],
-                None, # TODO: pdf is not yet supported
+                None,  # TODO: pdf is not yet supported
                 paper["original_id"] if "original_id" in paper else None,
                 paper["page_count"] if "page_count" in paper else None,
                 paper["order"] if "order" in paper else None,
@@ -67,11 +67,7 @@ class PublishedArchiveSerialiser:
             papers_in_session = []
             for paper_id in session["papers"]:
                 papers_in_session.append(papers[paper_id])
-            cur_session = Session(
-                str(session_idx),
-                session["title"],
-                papers_in_session
-            )
+            cur_session = Session(str(session_idx), session["title"], papers_in_session)
             sessions.append(cur_session)
 
         # Load the conference
@@ -85,7 +81,7 @@ class PublishedArchiveSerialiser:
                 elts = chair.split(" ")
                 first_name = " ".join(elts[:-1])
                 last_name = elts[-1]
-                email = f'{".".join(elts)}@none.org' # FIXME: email issue here!
+                email = f'{".".join(elts)}@none.org'  # FIXME: email issue here!
                 chairs.append(Person(first_name, last_name, email, set([Role.CHAIR])))
 
         conf = Conference(
@@ -110,7 +106,6 @@ class PublishedArchiveSerialiser:
 
         if len(conf.sessions) == 0:
             raise Exception("The conference should have sessions to be able to saved in the archive")
-
 
         # Fill conference meta information
         dict_out: dict[str, Any] = {
@@ -149,11 +144,7 @@ class PublishedArchiveSerialiser:
                 authors = []
                 for author in paper.authors:
                     authors.append([author.firstname, author.lastname])
-                cur_paper = {
-                    "authors": authors,
-                    "title": paper.title,
-                    "abstract": paper.abstract
-                }
+                cur_paper = {"authors": authors, "title": paper.title, "abstract": paper.abstract}
                 if isinstance(paper, PublishedPaper):
                     if paper.original_id is not None:
                         cur_paper["original_id"] = paper.original_id
@@ -187,7 +178,7 @@ class ArchiveInputSerialiser:
     def load(self, metadata_conf_file: pathlib.Path) -> Conference:
 
         # Load papers
-        papers_metadata = pd.read_csv(metadata_conf_file.parent/"papers.txt", sep=ARCHIVE_INPUT_DATA_SEP)
+        papers_metadata = pd.read_csv(metadata_conf_file.parent / "papers.txt", sep=ARCHIVE_INPUT_DATA_SEP)
         papers = dict()
         for _, paper in papers_metadata.iterrows():
             authors = []
@@ -205,30 +196,26 @@ class ArchiveInputSerialiser:
                 authors.append(Person(first_name, last_name, None, set([Role.AUTHOR])))
 
             abstract = ""
-            with open(metadata_conf_file.parent/f"abstracts/{paper.id}.txt") as f_abstract:
+            with open(metadata_conf_file.parent / f"abstracts/{paper.id}.txt") as f_abstract:
                 abstract = str(f_abstract.read()).strip()
 
             cur_paper = Paper(
                 paper.title,
                 authors,
                 abstract,
-                (metadata_conf_file.parent/f"pdfs/{paper.id}.pdf").resolve(),
-                id = paper.id
+                (metadata_conf_file.parent / f"pdfs/{paper.id}.pdf").resolve(),
+                id=paper.id,
             )
             papers[paper.id] = cur_paper
 
         # Load sessions
-        sessions_metadata = pd.read_csv(metadata_conf_file.parent/"sessions.txt", sep=ARCHIVE_INPUT_DATA_SEP)
+        sessions_metadata = pd.read_csv(metadata_conf_file.parent / "sessions.txt", sep=ARCHIVE_INPUT_DATA_SEP)
         sessions = list()
         for session_idx, session in sessions_metadata.iterrows():
             papers_in_session = []
             for paper_id in session.papers.split(ARCHIVE_INPUT_DATA_PAPER_SEP):
                 papers_in_session.append(papers[paper_id])
-            cur_session = Session(
-                str(session_idx),
-                session.title,
-                papers_in_session
-            )
+            cur_session = Session(str(session_idx), session.title, papers_in_session)
             sessions.append(cur_session)
 
         # Load the conference
@@ -271,13 +258,13 @@ class ArchiveInputSerialiser:
     def dump(self, conf: Conference, metadata_file: pathlib.Path):
 
         # Prepare directory
-        abstracts_dir = metadata_file.parent/"abstracts"
+        abstracts_dir = metadata_file.parent / "abstracts"
         abstracts_dir.mkdir(exist_ok=True, parents=True)
-        pdfs_dir = metadata_file.parent/"pdfs"
+        pdfs_dir = metadata_file.parent / "pdfs"
         pdfs_dir.mkdir(exist_ok=True, parents=True)
 
         # Create paper file
-        with open(metadata_file.parent/"papers.txt", "w") as f_papers:
+        with open(metadata_file.parent / "papers.txt", "w") as f_papers:
             f_papers.write(ARCHIVE_INPUT_DATA_SEP.join(["id", "title", "authors"]))
             f_papers.write("\n")
 
@@ -304,15 +291,15 @@ class ArchiveInputSerialiser:
                 if paper.abstract is None:
                     raise Exception(f"{paper_id} doesn't have any abstract, this is incompatible with the ISCA archive")
 
-                with open(abstracts_dir/f"{paper_id}.txt", "w") as f_abstract:
+                with open(abstracts_dir / f"{paper_id}.txt", "w") as f_abstract:
                     f_abstract.write(paper.abstract)
 
                 # Save PDF
                 if paper.pdf_file is not None:
-                    shutil.copy(paper.pdf_file.resolve(), pdfs_dir/f"{paper_id}.pdf")
+                    shutil.copy(paper.pdf_file.resolve(), pdfs_dir / f"{paper_id}.pdf")
 
         # Create session file
-        with open(metadata_file.parent/"sessions.txt", "w") as f_sessions:
+        with open(metadata_file.parent / "sessions.txt", "w") as f_sessions:
             f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
             f_sessions.write("\n")
 

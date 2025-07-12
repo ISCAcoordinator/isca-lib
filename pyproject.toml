@@ -34,15 +34,15 @@ Issues = "https://github.com/ISCACoordinator/isca/issues"
 git = "https://github.com/ISCACoordinator/isca.git"
 
 [tool.black]
-line-length = 120
+line-length = 130
 
 [tool.isort]
 profile = "black"
-line_length = 120
+line_length = 130
 
 [tool.flake8]
-max-line-length = 120  # Adjusted to 120 characters
-extend-ignore = "E203, W503"  # Adjust as per your preferences
+max-line-length = 130
+extend-ignore = "E203, W503"
 
 [tool.mypy]
 python_version = 3.11
