@@ -232,14 +232,14 @@ class Person:
         s = unidecode(s.lower())
         return s
 
-    def str_with_flatten_affiliations(self, paper_id: str, short=False, markers=True) -> str:
+    def str_with_flatten_affiliations(self, paper_id: str|None=None, short=False, markers=True) -> str:
         if markers:
             str_person = self.isca_name
         else:
             str_person = str(self)
 
         affiliations = []
-        if paper_id not in self.paper_affiliations:
+        if (paper_id is None) or (paper_id not in self.paper_affiliations):
             if short:
                 aff = self.default_affiliation.institute
                 if self.default_affiliation.country is not None:
@@ -288,19 +288,7 @@ class Person:
         return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
 
     def __str__(self) -> str:
-        last_name = self.lastname
-        if " " in last_name:
-            last_name = f"{{{last_name}}}"
-
-        if not self.firstname:
-            return last_name
-
-        if self.middle_initial is not None:
-            user_str = f"{self.firstname} {self.middle_initial} {last_name}"
-        else:
-            user_str = f"{self.firstname} {last_name}"
-
-        return user_str
+        return self.str_with_flatten_affiliations(markers=False)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Person):
