@@ -172,6 +172,14 @@ class PresentationSession(Session):
     def presentations(self) -> list[Presentation]:
         return self._presentations.copy()
 
+    @property
+    def papers(self) -> list[Paper]:
+        papers = []
+        for p in self._presentations:
+            if p.presented_paper is not None:
+                papers.append(p.presented_paper)
+        return papers
+
     def add_presentation(self, presentation: Presentation):
         self._presentations.append(presentation)
 
@@ -431,7 +439,7 @@ class Program(ISCAObject):
                     for session in timeslot_content[room_idx]:
                         sessions.append((session, timeslot, room))
 
-        return sorted(sessions, key=lambda x: x[0].start)
+        return sorted(sessions, key=lambda x: str(x[0].start) + "_" + str(x[0].id))
 
     def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[PresentationSession]]:
         sessions = dict()
