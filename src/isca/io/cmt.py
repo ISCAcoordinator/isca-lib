@@ -192,7 +192,6 @@ class CMTSerialiser:
                     default_affiliation=list_affiliations[0],
                     roles=set([Role.AUTHOR]),
                 )
-
             else:
                 cur_person.add_role(Role.AUTHOR)
                 if cur_person.firstname != first_name:
@@ -222,7 +221,6 @@ class CMTSerialiser:
                     # FIXME: force unknwon affiliation
                     cur_presenter = Person(pres_firstname, pres_lastname, Affiliation("Unknown"), pres_email)
                     self._annuary.add(cur_presenter)
-
                 cur_presenter.add_role(Role.PRESENTER)
                 presenters = [cur_presenter]
             else:
@@ -805,7 +803,7 @@ class CMTSerialiser:
                     if isinstance(cur_session, OralSession):
                         if paper_id in bs_paper_ids:
                             cur_presentation = BlueSkyPresentation(
-                                f"{session_id}_{paper_idx}",
+                                f"{session_id}-{paper_idx}",
                                 cur_paper.title,
                                 paper_presenters,
                                 40,  # TODO: the duration is hardcoded
@@ -814,7 +812,7 @@ class CMTSerialiser:
                             )
                         else:
                             cur_presentation = OralPresentation(
-                                f"{session_id}_{paper_idx}",
+                                f"{session_id}-{paper_idx}",
                                 cur_paper.title,
                                 paper_presenters,
                                 cur_session.default_duration,
@@ -823,7 +821,7 @@ class CMTSerialiser:
                             )
                     elif isinstance(cur_session, PosterSession):
                         cur_presentation = PosterPresentation(
-                            f"{session_id}_{paper_idx}",
+                            f"{session_id}-{paper_idx}",
                             cur_paper.title,
                             paper_presenters,
                             cur_paper.abstract,
@@ -831,7 +829,7 @@ class CMTSerialiser:
                         )
                     elif isinstance(cur_session, ShowAndTellSession):
                         cur_presentation = ShowAndTellPresentation(
-                            f"{session_id}_{paper_idx}",
+                            f"{session_id}-{paper_idx}",
                             cur_paper.title,
                             paper_presenters,
                             cur_paper.abstract,
@@ -839,7 +837,7 @@ class CMTSerialiser:
                         )
                     elif isinstance(cur_session, SpecialSession):
                         cur_presentation = SpecialPresentation(
-                            f"{session_id}_{paper_idx}",
+                            f"{session_id}-{paper_idx}",
                             cur_paper.title,
                             paper_presenters,
                             cur_paper.abstract,
