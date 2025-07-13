@@ -1,5 +1,6 @@
 from typing import Iterator
 from enum import Enum
+from isca.model.core import ISCAObject
 from unidecode import unidecode
 import logging
 import pandas as pd
@@ -201,6 +202,10 @@ class Person:
         return author_name
 
     @property
+    def roles(self) -> set[Role]:
+        return self._roles.copy()
+
+    @property
     def name(self) -> str:
         first = self.firstname
         last = self.lastname
@@ -341,8 +346,9 @@ class Person:
         return False
 
 
-class Annuary:
+class Annuary(ISCAObject):
     def __init__(self):
+        super().__init__()
         self._annuary: set[Person] = set()
         self._email_annuary: dict[str, Person] = dict()
 
@@ -400,3 +406,22 @@ class Annuary:
 
     def __iter__(self) -> Iterator[Person]:
         return iter(self._annuary)
+
+    def compress(self) -> "Annuary":
+        annuary = Annuary()
+        id_counter = 0
+        ignored_counter = 0
+        total_counter = len(self._annuary)
+        for person in self._annuary:
+            if person.roles:
+                person._id = str(id_counter)
+                id_counter += 1
+                annuary.add(person)
+            else:
+                ignored_counter += 1
+
+        ratio = ignored_counter / total_counter * 100
+        self._logger.info(
+            f"Compression removed {ignored_counter} ({ratio:.2f}%) persons from the annuary who didn't have any roles"
+        )
+        return annuary

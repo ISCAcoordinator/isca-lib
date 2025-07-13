@@ -895,7 +895,7 @@ class CMTSerialiser:
             conf_info["ISSN"] if "ISSN" in conf_info else None,
             conf_info["generateDOIs"] if "generateDOIs" in conf_info else False,
             conf_info["theme"] if "theme" in conf_info else None,
-            annuary=self._annuary,
+            annuary=self._annuary.compress(),
         )
 
         return conf
