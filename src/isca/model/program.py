@@ -3,8 +3,8 @@ import copy
 import datetime
 import numpy as np
 
-from .core import ISCAObject
-from .item import ISCAItem, Paper, Session
+from .core import ISCAObject, ISCAItem
+from .item import Paper, Session
 from .person import Person
 
 

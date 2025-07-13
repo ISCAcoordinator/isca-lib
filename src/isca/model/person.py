@@ -1,9 +1,11 @@
 from typing import Iterator
 from enum import Enum
-from isca.model.core import ISCAObject
 from unidecode import unidecode
 import logging
 import pandas as pd
+
+
+from .core import ISCAItem, ISCAObject
 
 
 class Affiliation:
@@ -96,7 +98,7 @@ class Role(Enum):
         return f'{self.name.replace("Role.", "")}'
 
 
-class Person:
+class Person(ISCAItem):
     """An affiliation to be associated to a person
 
     Attributes
@@ -146,7 +148,7 @@ class Person:
         id: str, optional
             A given identifier for the person. This field should only be used for serialisation purposes!
         """
-        self._logger = logging.getLogger(self.__class__.__name__)
+        super().__init__(self._generate_id() if id is None else id)
         self.firstname: str | None = firstname
         self.lastname: str = lastname
         self.default_affiliation: Affiliation = default_affiliation
@@ -155,7 +157,6 @@ class Person:
         self.email: str | None = email
         self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
         self.biography: str | None = biography
-        self._id: str = self._generate_id() if id is None else id
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -421,7 +422,7 @@ class Annuary(ISCAObject):
                 ignored_counter += 1
 
         ratio = ignored_counter / total_counter * 100
-        self._logger.info(
+        self.logger.info(
             f"Compression removed {ignored_counter} ({ratio:.2f}%) persons from the annuary who didn't have any roles"
         )
         return annuary

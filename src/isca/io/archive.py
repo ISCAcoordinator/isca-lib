@@ -8,6 +8,7 @@ import shutil
 
 # Data loading
 import json
+from isca.model.core import ISCAObject
 import pandas as pd
 
 # Model helpers
@@ -27,13 +28,11 @@ ARCHIVE_INPUT_DATA_AUTHOR_SEP = ", "
 ARCHIVE_INPUT_DATA_PAPER_SEP = ", "
 ARCHIVE_INPUT_AUTHOR_REGEXP = re.compile("([^{]*) {([^}]*)}")
 
+
 ###############################################################################
 # Core of the module
 ###############################################################################
-class PublishedArchiveSerialiser:
-    def __init__(self):
-        self._logger = logging.getLogger(self.__class__.__name__)
-
+class PublishedArchiveSerialiser(ISCAObject):
     def load(self, metadata_file: pathlib.Path, pdf_root_path: pathlib.Path | None = None) -> Conference:
         with open(metadata_file) as f_meta:
             metadata = json.load(f_meta)
@@ -171,12 +170,8 @@ class PublishedArchiveSerialiser:
             f_out.write(json.dumps(dict_out, indent=2))
 
 
-class ArchiveInputSerialiser:
-    def __init__(self):
-        self._logger = logging.getLogger(self.__class__.__name__)
-
+class ArchiveInputSerialiser(ISCAObject):
     def load(self, metadata_conf_file: pathlib.Path) -> Conference:
-
         # Load papers
         papers_metadata = pd.read_csv(metadata_conf_file.parent / "papers.txt", sep=ARCHIVE_INPUT_DATA_SEP)
         papers = dict()
@@ -256,7 +251,6 @@ class ArchiveInputSerialiser:
         return conf
 
     def dump(self, conf: Conference, output_dir: pathlib.Path):
-
         # Prepare directory
         abstracts_dir = output_dir / "abstracts"
         abstracts_dir.mkdir(exist_ok=True, parents=True)

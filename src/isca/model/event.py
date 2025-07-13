@@ -1,7 +1,8 @@
 import copy
 import datetime
 
-from .item import ISCAItem, Paper, Session
+from .core import ISCAItem
+from .item import Paper, Session
 from .person import Person, Annuary
 from .program import Program, PresentationSession, Room, Timeslot
 

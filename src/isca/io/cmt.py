@@ -1,7 +1,6 @@
 # Python
 from datetime import datetime
 import traceback
-import logging
 import re
 import pathlib
 
@@ -11,6 +10,7 @@ from openpyxl import load_workbook
 import pandas as pd
 
 # Model helpers
+from ..model.core import ISCAObject
 from ..model.person import Person, Affiliation, Role, Annuary
 from ..model.item import Paper, Session
 from ..model.program import (
@@ -96,9 +96,9 @@ CMT_AFFILIATION_REGEXP = re.compile(
 ###############################################################################
 # Core of the module
 ###############################################################################
-class CMTSerialiser:
+class CMTSerialiser(ISCAObject):
     def __init__(self, metadata_from_pdf: bool = False, ignore_sessions: bool = False):
-        self._logger = logging.getLogger(self.__class__.__name__)
+        super().__init__()
         self.metadata_from_pdf = metadata_from_pdf
         self.ignore_sessions = ignore_sessions
         self._annuary = Annuary()
@@ -112,8 +112,8 @@ class CMTSerialiser:
         # The number of elements should be the same
         if len(author_emails) != len(author_names):
             names = "\n".join(author_names)
-            self._logger.error(f"[{paper_id}] author names = {names}")
-            self._logger.error(f"[{paper_id}] author emails = {author_emails}")
+            self.logger.error(f"[{paper_id}] author names = {names}")
+            self.logger.error(f"[{paper_id}] author emails = {author_emails}")
             raise Exception(
                 f"[{paper_id}] The number of authors ({len(author_names)}) does not match the number of emails ({len(author_emails)})"
             )
@@ -185,7 +185,7 @@ class CMTSerialiser:
             else:
                 cur_person.add_role(Role.AUTHOR)
                 if cur_person.firstname != first_name:
-                    self._logger.debug(
+                    self.logger.debug(
                         f"[{paper_id}] Change the name of {email} from {cur_person.name} to {first_name} {last_name}"
                     )
 
@@ -203,7 +203,7 @@ class CMTSerialiser:
         if ("Q7 (New presenter)" in paper_info) and (not pd.isna(paper_info["Q7 (New presenter)"])):
             m = CMT_NEW_PRESENTER_REGEXP.match(paper_info["Q7 (New presenter)"])
             if m:
-                self._logger.error(f"Adding alternative presenter \"{paper_info['Q7 (New presenter)']}\" to paper {paper_id}")
+                self.logger.error(f"Adding alternative presenter \"{paper_info['Q7 (New presenter)']}\" to paper {paper_id}")
                 pres_firstname = m.group(1)
                 pres_lastname = m.group(2)
                 pres_email = m.group(3).lower().strip()
@@ -229,7 +229,7 @@ class CMTSerialiser:
             cur_presenter.add_role(Role.PRESENTER)
             presenters = [cur_presenter]
         else:
-            self._logger.debug(
+            self.logger.debug(
                 f"[{paper_id}] doesn't have a presenter",
                 extra={"paper_id": str(paper_info["Paper ID"]), "paper_serie": paper_info},
             )
@@ -298,7 +298,7 @@ class CMTSerialiser:
 
         if "sessions_spreadsheet" not in conf_info["input_data"]:
             self.ignore_sessions = True
-            self._logger.warning("There is no session spreadsheet indicated, we just ignore any session information")
+            self.logger.warning("There is no session spreadsheet indicated, we just ignore any session information")
         elif conf_info["input_data"]["sessions_spreadsheet"].startswith("/"):
             session_file = pathlib.Path(conf_info["input_data"]["sessions_spreadsheet"])
         else:
@@ -364,7 +364,7 @@ class CMTSerialiser:
                         elif r == "Setting-Reader":
                             roles.add(Role.SETTING_READER)
                         elif r == "Not in CMT":
-                            self._logger.debug(
+                            self.logger.debug(
                                 f'User "{str(user_row["Email"]).strip()}" is not part of CMT users, inferred to be an author'
                             )
                             roles.add(Role.AUTHOR)
@@ -437,7 +437,7 @@ class CMTSerialiser:
                         elif r == "Setting-Reader":
                             roles.add(Role.SETTING_READER)
                         elif r == "Not in CMT":
-                            self._logger.debug(
+                            self.logger.debug(
                                 f'User "{str(user_row["Email"]).strip()}" is not part of CMT users, inferred to be an author'
                             )
                             roles.add(Role.AUTHOR)
@@ -479,7 +479,7 @@ class CMTSerialiser:
 
                 # Ignore withdrawn papers
                 if ("Withdrawn" in paper_info) and (paper_info["Withdrawn"]):
-                    self._logger.info(f"[{paper_id}] The paper is withdrawn")
+                    self.logger.info(f"[{paper_id}] The paper is withdrawn")
                     continue
 
                 # First use the metadata as "default" information
@@ -492,7 +492,7 @@ class CMTSerialiser:
                     pdf_path = paper_root_dir / f"{paper_id}.pdf"
 
                     if (updated_paper_root_dir is not None) and (updated_paper_root_dir / f"{paper_id}.pdf").exists():
-                        self._logger.debug(
+                        self.logger.debug(
                             f"[{paper_id}] using the updated PDF",
                             extra={
                                 "paper_id": paper_id,
@@ -507,7 +507,7 @@ class CMTSerialiser:
                             cur_paper.title = title
                             cur_paper.authors = authors  # TODO: for now it is not linked to any email
 
-                            self._logger.debug(
+                            self.logger.debug(
                                 f"[{paper_id}] Metadata extracted from the PDF {pdf_path}",
                                 extra={
                                     "paper_id": paper_id,
@@ -516,14 +516,14 @@ class CMTSerialiser:
                                 },
                             )
                         else:
-                            self._logger.warning(
+                            self.logger.warning(
                                 f"[{paper_id}] No PDF attached",
                                 extra={"paper_id": paper_id},
                             )
                             no_pdf += 1
 
                     except WordException:
-                        self._logger.warning(
+                        self.logger.warning(
                             f"[{paper_id}] Can't extract the information from a PDF generated by word",
                             extra={
                                 "paper_id": paper_id,
@@ -531,7 +531,7 @@ class CMTSerialiser:
                         )
                         word_papers += 1
                     except (PDFMetadataException, KeyError, IndexError) as ex:
-                        self._logger.error(
+                        self.logger.error(
                             f"[{paper_id}] Extraction of the metadata from the PDF failed, falling back on the excel spreadsheet",
                             extra={
                                 "paper_id": paper_id,
@@ -553,7 +553,7 @@ class CMTSerialiser:
                     self._annuary.add(cur_author)
                 dict_presenters[cur_paper.id] = presenters
 
-            self._logger.info(
+            self.logger.info(
                 f"[{worksheet}] total number of submissions {total_papers}: "
                 + f"failed_papers={failed_papers} ({failed_papers/total_papers*100:.2f}%), "
                 + f"word_papers={word_papers} ({word_papers/total_papers*100:.2f}%), "
@@ -764,7 +764,7 @@ class CMTSerialiser:
             elif session_type.lower() == "special":
                 cur_session = SpecialSession(session_id, session_name, cur_time_slot.start, cur_time_slot.end)
             else:
-                self._logger.error(
+                self.logger.error(
                     f'[{session_id}] This session type "{session_type}" is not yet supported (ignored)',
                     extra={"session_id": session_id, "session_name": session_name},
                 )
@@ -828,7 +828,7 @@ class CMTSerialiser:
                 elif paper_id in survey_talks:
                     cur_presentation = survey_talks[paper_id]
                 else:
-                    self._logger.error(
+                    self.logger.error(
                         f"[{session_id}] {paper_id} is not an available papers (it could have been withdrawn), so it is ignored",
                         extra={"session_id": session_id, "session_name": session_name},
                     )
@@ -836,7 +836,7 @@ class CMTSerialiser:
 
                 cur_session.add_presentation(cur_presentation)
 
-            self._logger.debug(f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session})
+            self.logger.debug(f"{session_id} has been loaded", extra={"session_id": session_id, "session_obj": cur_session})
             program.add_session(cur_time_slot, cur_room, cur_session)
             list_sessions.append(cur_session)
 

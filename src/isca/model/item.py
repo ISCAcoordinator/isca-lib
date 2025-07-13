@@ -1,17 +1,7 @@
 import pathlib
 
-from .core import ISCAObject
+from .core import ISCAItem
 from .person import Affiliation, Person
-
-
-class ISCAItem(ISCAObject):
-    def __init__(self, id: str):
-        super().__init__()
-        self._id = id
-
-    @property
-    def id(self) -> str:
-        return self._id
 
 
 class Paper(ISCAItem):
@@ -96,7 +86,7 @@ class Paper(ISCAItem):
             pdf_file = pathlib.Path(pdf_file)
 
         if (pdf_file is not None) and (not pdf_file.exists()):
-            self._logger.warning(f"[{self.id}] The given PDF file doesn't exist, revert to None: {pdf_file}")
+            self.logger.warning(f"[{self.id}] The given PDF file doesn't exist, revert to None: {pdf_file}")
             pdf_file = None
 
         self._pdf_file = pdf_file
