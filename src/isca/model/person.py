@@ -1,7 +1,7 @@
 from typing import Iterator
 from enum import Enum
+from pandas.core.indexes.range import Callable
 from unidecode import unidecode
-import logging
 import pandas as pd
 
 
@@ -408,21 +408,19 @@ class Annuary(ISCAObject):
     def __iter__(self) -> Iterator[Person]:
         return iter(self._annuary)
 
-    def compress(self) -> "Annuary":
+    def compress(self, select_criterion: Callable[[Person], bool] = lambda x: bool(x.roles)) -> "Annuary":
         annuary = Annuary()
         id_counter = 0
         ignored_counter = 0
         total_counter = len(self._annuary)
-        for person in self._annuary:
-            if person.roles:
+        sorted_annuary = sorted(list(self._annuary), key=lambda x: x.str_sorting_by_last_name())
+        for person in sorted_annuary:
+            if select_criterion(person):
                 person._id = str(id_counter)
-                id_counter += 1
                 annuary.add(person)
+                id_counter += 1
             else:
                 ignored_counter += 1
-
         ratio = ignored_counter / total_counter * 100
-        self.logger.info(
-            f"Compression removed {ignored_counter} ({ratio:.2f}%) persons from the annuary who didn't have any roles"
-        )
+        self.logger.info(f"Compression removed {ignored_counter} ({ratio:.2f}%) persons from the annuary")
         return annuary

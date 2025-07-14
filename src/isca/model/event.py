@@ -1,6 +1,8 @@
 import copy
 import datetime
 
+from pandas.core.indexes.range import Callable
+
 from .core import ISCAItem
 from .item import Paper, Session
 from .person import Person, Annuary
@@ -130,6 +132,12 @@ class Conference(Event):
             return []
 
         return self._authors2papers[author]
+
+    def compress_annuary(self, select_criterion: Callable[[Person], bool] | None = None):
+        if select_criterion is not None:
+            self._annuary = self._annuary.compress(select_criterion)
+        else:
+            self._annuary = self._annuary.compress()
 
     @property
     def reviewers(self) -> set[Person]:
