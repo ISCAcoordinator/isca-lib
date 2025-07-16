@@ -276,7 +276,9 @@ class Person(ISCAItem):
                     affiliation = repr(affiliation)
                 else:
                     affiliation = str(affiliation)
-                affiliations.append(affiliation)
+
+                if affiliation not in affiliations:
+                    affiliations.append(affiliation)
         str_person += f" ({'; '.join(affiliations)})"
 
         return str_person
