@@ -1,5 +1,6 @@
 from typing import Iterator
 from enum import Enum
+import pathlib
 from pandas.core.indexes.range import Callable
 from unidecode import unidecode
 import pandas as pd
@@ -120,6 +121,7 @@ class Person(ISCAItem):
 
     def __init__(
         self,
+        id: str | None,
         firstname: str | None,
         lastname: str,
         default_affiliation: Affiliation,
@@ -127,8 +129,6 @@ class Person(ISCAItem):
         roles: set[Role] = set([Role.DEFAULT]),
         paper_affiliations: dict[str, list[Affiliation]] | None = None,
         middle_initial: str | None = None,
-        biography: str | None = None,
-        id: str | None = None,
     ):
         """Initialisation method
 
@@ -156,7 +156,6 @@ class Person(ISCAItem):
         self._roles: set[Role] = roles
         self.email: str | None = email
         self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
-        self.biography: str | None = biography
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -349,6 +348,42 @@ class Person(ISCAItem):
         return False
 
 
+class Speaker(Person):
+    def __init__(
+        self,
+        id: str | None,
+        firstname: str | None,
+        lastname: str,
+        default_affiliation: Affiliation,
+        email: str | None = None,
+        roles: set[Role] = set([Role.DEFAULT]),
+        paper_affiliations: dict[str, list[Affiliation]] | None = None,
+        middle_initial: str | None = None,
+        biography: str | None = None,
+        url: str | None = None,
+        photo: pathlib.Path | None = None,
+    ):
+        super().__init__(id, firstname, lastname, default_affiliation, email, roles, paper_affiliations, middle_initial)
+        self.biography: str | None = biography
+        self.url: str | None = url
+        self.photo: pathlib.Path | None = photo
+        self.add_role(Role.PRESENTER)
+
+    @classmethod
+    def from_person(cls, person: Person) -> "Speaker":
+        speaker = Speaker(
+            person.id,
+            person.firstname,
+            person.lastname,
+            person.default_affiliation,
+            person.email,
+            person.roles,
+            person.paper_affiliations,
+            person.middle_initial,
+        )
+        return speaker
+
+
 class Annuary(ISCAObject):
     def __init__(self):
         super().__init__()
@@ -368,6 +403,13 @@ class Annuary(ISCAObject):
     def update(self, other: "Annuary"):
         for person in other._annuary:
             self._annuary.add(person)
+
+    def replace(self, old_person: Person, new_person: Person):
+        assert old_person.email is not None
+        del self._email_annuary[old_person.email]
+        self._annuary.remove(old_person)
+
+        self.add(new_person)
 
     def find_person_by_email(self, email: str) -> Person | None:
         if email not in self._email_annuary:
