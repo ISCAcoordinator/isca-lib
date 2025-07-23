@@ -81,18 +81,6 @@ class PosterPresentation(Presentation):
         super().__init__(id, title, presenters, None, abstract, presented_paper)
 
 
-class SurveyTalk(OralPresentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int,
-        abstract: str | None = None,
-    ):
-        super().__init__(id, title, presenters, duration, abstract, None)
-
-
 class Keynote(OralPresentation):
     def __init__(
         self,
@@ -103,43 +91,6 @@ class Keynote(OralPresentation):
         abstract: str | None = None,
     ):
         super().__init__(id, title, presenters, duration, abstract, None)
-
-
-class SpecialPresentation(Presentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, None, abstract, presented_paper)
-
-
-class ShowAndTellPresentation(Presentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, None, abstract, presented_paper)
-
-
-class BlueSkyPresentation(OralPresentation):
-    def __init__(
-        self,
-        id: str,
-        title: str,
-        presenters: list[Person] | None,
-        duration: int,
-        abstract: str | None = None,
-        presented_paper: Paper | None = None,
-    ):
-        super().__init__(id, title, presenters, duration, abstract, presented_paper)
 
 
 #########################################################################################################
@@ -291,38 +242,6 @@ class KeynoteSession(OralSession):
 
 
 class PosterSession(PresentationSession):
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        start: datetime.datetime,
-        end: datetime.datetime,
-        presentations: list[Presentation] | None = None,
-        chairs: list[Person] | None = None,
-    ):
-        super().__init__(id, name, start, end, presentations, chairs)
-
-
-class SpecialSession(PresentationSession):
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        start: datetime.datetime,
-        end: datetime.datetime,
-        description: str,
-        presentations: list[Presentation] | None = None,
-        chairs: list[Person] | None = None,
-    ):
-        super().__init__(id, name, start, end, presentations, chairs)
-        self._description: str = description
-
-    @property
-    def description(self) -> str:
-        return self._description
-
-
-class ShowAndTellSession(PresentationSession):
     def __init__(
         self,
         id: str,
