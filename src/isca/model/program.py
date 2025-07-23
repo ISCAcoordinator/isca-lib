@@ -305,10 +305,16 @@ class SpecialSession(PresentationSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
+        description: str,
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, start, end, presentations, chairs)
+        self._description = description
+
+    @property
+    def description(self) -> str:
+        return self._description
 
 
 class ShowAndTellSession(PresentationSession):
