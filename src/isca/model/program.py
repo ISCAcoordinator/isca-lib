@@ -342,6 +342,8 @@ class TimeslotType(Enum):
     LUNCH_BREAK = 3
     ASSEMBLY = 4
     SCIENCE = 5
+    TUTORIAL = 6
+    GENERAL_ASSEMBLY = 7
 
     def __str__(self) -> str:
         """Return the string representation of the role
@@ -372,6 +374,11 @@ class Timeslot(ISCAItem):
     @property
     def date(self) -> datetime.date:
         return self.start.date()
+
+    @property
+    def duration(self) -> int:
+        duration = self.end - self.start
+        return duration.seconds // 60
 
     def __repr__(self) -> str:
         date = self.date.strftime("%Y-%m-%d")
