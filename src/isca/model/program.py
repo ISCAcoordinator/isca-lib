@@ -2,6 +2,7 @@ from enum import Enum
 import copy
 import datetime
 import numpy as np
+import numpy.typing as npt
 
 from .core import ISCAObject, ISCAItem
 from .item import Paper, Session
@@ -38,10 +39,14 @@ class Presentation(ISCAItem):
         return self._presented_paper
 
     def __str__(self):
-        talk_info = f"[{self.__class__.__name__} - {self.id}] {self.title}\n"
+        talk_info = f"[{self.__class__.__name__} - {self.id}] {self.title}"
         if self.presenters is not None:
+            talk_info += "\n"
+            talk_info += "presenter(s): "
+            presenters = []
             for presenter in self.presenters:
-                talk_info += f"  - {presenter}\n"
+                presenters.append(str(presenter))
+            talk_info += "; ".join(presenters)
 
         return talk_info
 
@@ -153,12 +158,12 @@ class PresentationSession(Session):
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name)
-        self._presentations = presentations if presentations is not None else []
-        self.chairs = chairs if chairs is not None else []
+        self._presentations: list[Presentation] = presentations if presentations is not None else []
+        self.chairs: list[Person] = chairs if chairs is not None else []
 
         # For now, start/end can't be modified to avoid side effects!
-        self._start = start
-        self._end = end
+        self._start: datetime.datetime = start
+        self._end: datetime.datetime = end
 
     @property
     def start(self) -> datetime.datetime:
@@ -218,7 +223,7 @@ class OralSession(PresentationSession):
         default_presentation_duration: int = 20,
     ):
         super().__init__(id, name, start, end, presentations, chairs)
-        self._default_presentation_duration = default_presentation_duration
+        self._default_presentation_duration: int = default_presentation_duration
 
     def add_presentation(self, presentation: Presentation):
         if not isinstance(presentation, OralPresentation):
@@ -310,7 +315,7 @@ class SpecialSession(PresentationSession):
         chairs: list[Person] | None = None,
     ):
         super().__init__(id, name, start, end, presentations, chairs)
-        self._description = description
+        self._description: str = description
 
     @property
     def description(self) -> str:
@@ -426,9 +431,9 @@ class Room(ISCAItem):
 class Program(ISCAObject):
     def __init__(self, timeslots: list[Timeslot], rooms: list[Room]):
         super().__init__()
-        self._timeslots = sorted(timeslots, key=lambda x: x.start)
-        self._rooms = rooms
-        self._program_matrix = np.full((len(self._timeslots), len(self._rooms)), None)
+        self._timeslots: list[Timeslot] = sorted(timeslots, key=lambda x: x.start)
+        self._rooms: list[Room] = rooms
+        self._program_matrix: npt.NDArray[PresentationSession | None] = np.full((len(self._timeslots), len(self._rooms)), None)
 
     def get_timeslots(self, day: datetime.date | None = None) -> list[Timeslot]:
         if day is None:
