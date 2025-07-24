@@ -309,7 +309,7 @@ class Person(ISCAItem):
         return hash(self._id)
 
     def __repr__(self) -> str:
-        return f"Person(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
+        return f"{self.__class__.__name__}(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
 
     def __str__(self) -> str:
         last_name = self.lastname
@@ -393,19 +393,32 @@ class Annuary(ISCAObject):
         self._annuary: set[Person] = set()
         self._email_annuary: dict[str, Person] = dict()
 
-    def add(self, person: Person):
-        if (person.email is not None) and (self.find_person_by_email(person.email) is not None):
-            return
+    def add(self, person: Person, force: bool = False):
+        if (person.firstname == "Hosein") and (not isinstance(person, Speaker)):
+            raise Exception(repr(person))
 
-        if person not in self._annuary:
-            self._annuary.add(person)
-
+        # Check if person exist
+        email_person = None
         if person.email is not None:
-            self._email_annuary[person.email] = person
+            email_person = self.find_person_by_email(person.email)
 
-    def update(self, other: "Annuary"):
-        for person in other._annuary:
+        if (person in self._annuary) or (email_person is not None):
+            if not force:
+                return
+
+            self._annuary.remove(person)
             self._annuary.add(person)
+            if person.email is not None:
+                self._email_annuary[person.email] = person
+
+        else:
+            self._annuary.add(person)
+            if person.email is not None:
+                self._email_annuary[person.email] = person
+
+    def update(self, other: "Annuary", force: bool = False):
+        for person in other._annuary:
+            self.add(person, force)
 
     def replace(self, old_person: Person, new_person: Person):
         assert old_person.email is not None
@@ -457,15 +470,12 @@ class Annuary(ISCAObject):
 
     def compress(self, select_criterion: Callable[[Person], bool] = lambda x: bool(x.roles)) -> "Annuary":
         annuary = Annuary()
-        id_counter = 0
         ignored_counter = 0
         total_counter = len(self._annuary)
         sorted_annuary = sorted(list(self._annuary), key=lambda x: x.str_sorting_by_last_name())
         for person in sorted_annuary:
             if select_criterion(person):
-                person._id = str(id_counter)
                 annuary.add(person)
-                id_counter += 1
             else:
                 ignored_counter += 1
         ratio = ignored_counter / total_counter * 100
