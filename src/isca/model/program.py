@@ -1,3 +1,5 @@
+from typing_extensions import Callable
+
 from enum import Enum
 import copy
 import datetime
@@ -473,6 +475,50 @@ class Program(ISCAObject):
                         sessions.append((timeslot, room, session))
 
         return sessions
+
+    def select_sessions(
+        self, criterion: Callable[[Timeslot, Room, PresentationSession], bool] | None
+    ) -> list[tuple[Timeslot, Room, PresentationSession]]:
+        if criterion is None:
+            return self.sessions
+
+        sessions = []
+        for timeslot_idx, timeslot in enumerate(self._timeslots):
+
+            timeslot_content = self._program_matrix[timeslot_idx]
+            for room_idx, room in enumerate(self._rooms):
+                if timeslot_content[room_idx] is not None:
+                    for session in timeslot_content[room_idx]:
+                        if criterion(timeslot, room, session):
+                            sessions.append((timeslot, room, session))
+
+        return sessions
+
+    def get_information(self, wanted_presentation: Presentation) -> tuple[Timeslot, Room]:
+        info = None
+        for timeslot_idx, timeslot in enumerate(self._timeslots):
+            timeslot_content = self._program_matrix[timeslot_idx]
+            for room_idx, room in enumerate(self._rooms):
+                if timeslot_content[room_idx] is not None:
+                    for session in timeslot_content[room_idx]:
+                        for cur_presentation in session.presentations:
+                            if cur_presentation == wanted_presentation:
+                                info = (timeslot, room)
+                                break
+
+                        if info is not None:
+                            break
+
+                if info is not None:
+                    break
+
+            if info is not None:
+                break
+
+        if info is None:
+            raise Exception(f"The following presentation is not part of the program: {repr(wanted_presentation)}")
+
+        return info
 
     def authors2presentations(self) -> dict[Person, list[Presentation]]:
         authors2presentations = dict()

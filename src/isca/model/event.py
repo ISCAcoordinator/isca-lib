@@ -1,7 +1,7 @@
+from typing_extensions import Callable
+
 import copy
 import datetime
-
-from pandas.core.indexes.range import Callable
 
 from .core import ISCAItem
 from .item import Paper, Session

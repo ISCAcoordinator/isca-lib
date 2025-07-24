@@ -1,8 +1,10 @@
 from typing import Iterator
+from typing_extensions import Callable
+
 from enum import Enum
 import pathlib
-from pandas.core.indexes.range import Callable
 from unidecode import unidecode
+
 import pandas as pd
 
 
