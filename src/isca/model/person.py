@@ -157,6 +157,9 @@ class Person(ISCAItem):
         self.email: str | None = email
         self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
 
+        if self.email is not None:
+            self.email = self.email.lower().strip()
+
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
 
