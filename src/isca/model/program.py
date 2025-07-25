@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from .core import ISCAObject, ISCAItem
-from .item import Paper, ScientificSession
+from .item import Paper, ScientificSession, Session
 from .person import Person
 
 
@@ -25,6 +25,7 @@ class TimeslotType(Enum):
     SCIENCE = 5
     TUTORIAL = 6
     GENERAL_ASSEMBLY = 7
+    SOCIAL = 8
 
     def __str__(self) -> str:
         """Return the string representation of the role
@@ -181,6 +182,11 @@ class Keynote(OralPresentation):
 #########################################################################################################
 ### Sessions
 #########################################################################################################
+class SocialSession(Session):
+    def __init__(self, id: str, name: str):
+        super().__init__(id, name)
+
+
 class PresentationSession(ScientificSession):
     def __init__(
         self,
@@ -378,7 +384,7 @@ class Program(ISCAObject):
         super().__init__()
         self._timeslots: list[Timeslot] = sorted(timeslots, key=lambda x: x.start)
         self._rooms: list[Room] = rooms
-        self._program_matrix: npt.NDArray[PresentationSession | None] = np.full((len(self._timeslots), len(self._rooms)), None)
+        self._program_matrix: npt.NDArray[Session | None] = np.full((len(self._timeslots), len(self._rooms)), None)
 
     def get_timeslots(self, day: datetime.date | None = None) -> list[Timeslot]:
         if day is None:
@@ -391,7 +397,7 @@ class Program(ISCAObject):
 
         return sorted(timeslots, key=lambda x: x.start)
 
-    def get_day_sessions(self, day: datetime.date) -> list[tuple[PresentationSession, Timeslot, Room]]:
+    def get_day_sessions(self, day: datetime.date) -> list[tuple[Session, Timeslot, Room]]:
         sessions = []
         timeslots = self.get_timeslots(day)
         for timeslot in timeslots:
@@ -402,9 +408,9 @@ class Program(ISCAObject):
                     for session in timeslot_content[room_idx]:
                         sessions.append((session, timeslot, room))
 
-        return sorted(sessions, key=lambda x: str(x[0].start) + "_" + str(x[0].id))
+        return sorted(sessions, key=lambda x: str(x[1].start) + "_" + str(x[0].id))
 
-    def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[PresentationSession]]:
+    def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[Session]]:
         sessions = dict()
         if isinstance(timeslot, Timeslot):
             timeslot_idx = self._timeslots.index(timeslot)  # NOTE: could be improved to be faster
@@ -437,7 +443,7 @@ class Program(ISCAObject):
 
         return self._program_matrix[timeslot_idx, room_idx][zone_idx]
 
-    def add_session(self, timeslot: Timeslot | int, room: Room | int, session: PresentationSession) -> PresentationSession | None:
+    def add_session(self, timeslot: Timeslot | int, room: Room | int, session: Session) -> Session | None:
         if isinstance(timeslot, int):
             timeslot_idx = timeslot
         else:
@@ -463,7 +469,7 @@ class Program(ISCAObject):
         self._program_matrix[timeslot_idx, room_idx] = cur_session
         return prev_sessions
 
-    def remove_session(self, timeslot: Timeslot, room: Room) -> PresentationSession | None:
+    def remove_session(self, timeslot: Timeslot, room: Room) -> Session | None:
         timeslot_idx = self._timeslots.index(timeslot)
         room_idx = self._rooms.index(room)
 
@@ -488,7 +494,7 @@ class Program(ISCAObject):
         return copy.deepcopy(self._rooms)
 
     @property
-    def sessions(self) -> list[tuple[Timeslot, Room, PresentationSession]]:
+    def sessions(self) -> list[tuple[Timeslot, Room, Session]]:
         sessions = []
         for timeslot_idx, timeslot in enumerate(self._timeslots):
 
@@ -501,8 +507,8 @@ class Program(ISCAObject):
         return sessions
 
     def select_sessions(
-        self, criterion: Callable[[Timeslot, Room, PresentationSession], bool] | None
-    ) -> list[tuple[Timeslot, Room, PresentationSession]]:
+        self, criterion: Callable[[Timeslot, Room, Session], bool] | None
+    ) -> list[tuple[Timeslot, Room, Session]]:
         if criterion is None:
             return self.sessions
 
@@ -525,6 +531,9 @@ class Program(ISCAObject):
             for room_idx, room in enumerate(self._rooms):
                 if timeslot_content[room_idx] is not None:
                     for session in timeslot_content[room_idx]:
+                        if not isinstance(session, PresentationSession):
+                            continue
+
                         for cur_presentation in session.presentations:
                             if cur_presentation == wanted_presentation:
                                 info = (timeslot, room)
@@ -549,6 +558,9 @@ class Program(ISCAObject):
         sessions = self.sessions
         for session_info in sessions:
             _, _, session = session_info
+            if not isinstance(session, PresentationSession):
+                continue
+
             for presentation in session.presentations:
                 if presentation.presented_paper is None:
                     continue
