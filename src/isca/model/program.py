@@ -12,6 +12,89 @@ from .person import Person
 
 
 #########################################################################################################
+### Timeslot classes
+#########################################################################################################
+
+
+class TimeslotType(Enum):
+    CEREMONY = 0
+    KEYNOTE = 1
+    COFFEE_BREAK = 2
+    LUNCH_BREAK = 3
+    ASSEMBLY = 4
+    SCIENCE = 5
+    TUTORIAL = 6
+    GENERAL_ASSEMBLY = 7
+
+    def __str__(self) -> str:
+        """Return the string representation of the role
+
+        Returns
+        -------
+        str
+            the (uppercase) name of the role
+        """
+        return f'{self.name.replace("TimeslotType.", "")}'
+
+
+class AnonymousTimeslot:
+    def __init__(
+        self,
+        start: datetime.datetime,
+        end: datetime.datetime,
+    ):
+        self.start: datetime.datetime = start
+        self.end: datetime.datetime = end
+
+    @property
+    def date(self) -> datetime.date:
+        return self.start.date()
+
+    @property
+    def duration(self) -> int:
+        duration = self.end - self.start
+        return duration.seconds // 60
+
+    def __repr__(self) -> str:
+        date = self.date.strftime("%Y-%m-%d")
+        start = self.start.strftime("%H:%M")
+        end = self.end.strftime("%H:%M")
+        return f"AnonymousTimeslot(date={date}, start={start}, end={end})"
+
+    def timeslot_without_date(self) -> str:
+        start = self.start.strftime("%H:%M")
+        end = self.end.strftime("%H:%M")
+        return f"{start} -- {end}"
+
+    def __str__(self) -> str:
+        return repr(self)
+
+
+class Timeslot(AnonymousTimeslot, ISCAItem):
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        type: TimeslotType,
+        start: datetime.datetime,
+        end: datetime.datetime,
+    ):
+        AnonymousTimeslot.__init__(self, start, end)
+        ISCAItem.__init__(self, id)
+        self.name: str = name
+        self.type: TimeslotType = type
+
+    def __repr__(self) -> str:
+        date = self.date.strftime("%Y-%m-%d")
+        start = self.start.strftime("%H:%M")
+        end = self.end.strftime("%H:%M")
+        return f"Timeslot(id={self.id}, name={self.name}, type={self.type}, date={date}, start={start}, end={end})"
+
+    def __str__(self) -> str:
+        return repr(self)
+
+
+#########################################################################################################
 ### Presentation classes
 #########################################################################################################
 class Presentation(ISCAItem):
@@ -224,6 +307,9 @@ class OralSession(PresentationSession):
 
         return self.start_presentation(presentation) + datetime.timedelta(minutes=presentation.duration)
 
+    def timeslot_presentation(self, presentation: Presentation | int) -> AnonymousTimeslot:
+        return AnonymousTimeslot(self.start_presentation(presentation), self.end_presentation(presentation))
+
     @property
     def default_duration(self) -> int:
         return self._default_presentation_duration
@@ -259,66 +345,6 @@ class PosterSession(PresentationSession):
 #########################################################################################################
 ### Program
 #########################################################################################################
-
-
-class TimeslotType(Enum):
-    CEREMONY = 0
-    KEYNOTE = 1
-    COFFEE_BREAK = 2
-    LUNCH_BREAK = 3
-    ASSEMBLY = 4
-    SCIENCE = 5
-    TUTORIAL = 6
-    GENERAL_ASSEMBLY = 7
-
-    def __str__(self) -> str:
-        """Return the string representation of the role
-
-        Returns
-        -------
-        str
-            the (uppercase) name of the role
-        """
-        return f'{self.name.replace("TimeslotType.", "")}'
-
-
-class Timeslot(ISCAItem):
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        type: TimeslotType,
-        start: datetime.datetime,
-        end: datetime.datetime,
-    ):
-        super().__init__(id)
-        self.name: str = name
-        self.type: TimeslotType = type
-        self.start: datetime.datetime = start
-        self.end: datetime.datetime = end
-
-    @property
-    def date(self) -> datetime.date:
-        return self.start.date()
-
-    @property
-    def duration(self) -> int:
-        duration = self.end - self.start
-        return duration.seconds // 60
-
-    def __repr__(self) -> str:
-        date = self.date.strftime("%Y-%m-%d")
-        start = self.start.strftime("%H:%M")
-        end = self.end.strftime("%H:%M")
-        return f"Timeslot(id={self.id}, name={self.name}, type={self.type}, date={date}, start={start}, end={end})"
-
-    def timeslot_without_date(self) -> str:
-        start = self.start.strftime("%H:%M")
-        end = self.end.strftime("%H:%M")
-        return f"{start} -- {end}"
-
-    def __str__(self) -> str:
-        return repr(self)
 
 
 class Room(ISCAItem):
