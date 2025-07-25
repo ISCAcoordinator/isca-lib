@@ -13,7 +13,7 @@ import pandas as pd
 
 # Model helpers
 from ..model.person import Person, Role
-from ..model.item import Paper, PublishedPaper, Session
+from ..model.item import Paper, PublishedPaper, ScientificSession
 from ..model.event import Conference
 
 
@@ -66,7 +66,7 @@ class PublishedArchiveSerialiser(ISCAObject):
             papers_in_session = []
             for paper_id in session["papers"]:
                 papers_in_session.append(papers[paper_id])
-            cur_session = Session(str(session_idx), session["title"], papers_in_session)
+            cur_session = ScientificSession(str(session_idx), session["title"], papers_in_session)
             sessions.append(cur_session)
 
         # Load the conference
@@ -210,7 +210,7 @@ class ArchiveInputSerialiser(ISCAObject):
             papers_in_session = []
             for paper_id in session.papers.split(ARCHIVE_INPUT_DATA_PAPER_SEP):
                 papers_in_session.append(papers[paper_id])
-            cur_session = Session(str(session_idx), session.title, papers_in_session)
+            cur_session = ScientificSession(str(session_idx), session.title, papers_in_session)
             sessions.append(cur_session)
 
         # Load the conference

@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from .core import ISCAObject, ISCAItem
-from .item import Paper, Session
+from .item import Paper, ScientificSession
 from .person import Person
 
 
@@ -181,9 +181,7 @@ class Keynote(OralPresentation):
 #########################################################################################################
 ### Sessions
 #########################################################################################################
-
-
-class PresentationSession(Session):
+class PresentationSession(ScientificSession):
     def __init__(
         self,
         id: str,

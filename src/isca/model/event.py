@@ -4,7 +4,7 @@ import copy
 import datetime
 
 from .core import ISCAItem
-from .item import Paper, Session
+from .item import Paper, ScientificSession
 from .person import Person, Annuary
 from .program import Program, PresentationSession, Room, Timeslot
 
@@ -38,7 +38,7 @@ class Conference(Event):
         end_date: datetime.date,
         papers: dict[str, Paper],
         program: Program | None = None,
-        sessions: list[Session] | None = None,
+        sessions: list[ScientificSession] | None = None,
         location: str | None = None,
         url: str | None = None,
         serie: str | None = None,
@@ -54,7 +54,7 @@ class Conference(Event):
         self.generate_doi: bool = generate_doi
         self.chairs: list[Person] | None = chairs
         self._papers: dict[str, Paper] = papers
-        self._sessions: list[Session] = sessions if sessions is not None else list()
+        self._sessions: list[ScientificSession] = sessions if sessions is not None else list()
         self._program: Program | None = program
         self._authors2papers: dict[Person, list[Paper]] = dict()
         self._annuary: Annuary = copy.copy(annuary) if annuary is not None else Annuary()
@@ -86,7 +86,7 @@ class Conference(Event):
         assert self._program is not None
         return self._program.get_timeslots(day)
 
-    def add_session(self, session: Session, force_replace: bool = True):
+    def add_session(self, session: ScientificSession, force_replace: bool = True):
         if self._program is not None:
             raise NotImplementedError(
                 "The conference has a proper program (accessible through the property program), do not use the current method"
@@ -104,7 +104,7 @@ class Conference(Event):
         self._sessions.append(session)
         self._sessions = sorted(self._sessions, key=lambda x: x.sort_criterion())  # Sort sessions by starting time
 
-    def remove_session(self, session: Session):
+    def remove_session(self, session: ScientificSession):
         if self._program is not None:
             raise NotImplementedError(
                 "The conference has a proper program (accessible through the property program), do not use the current method"
@@ -159,7 +159,7 @@ class Conference(Event):
         return self._papers.copy()
 
     @property
-    def sessions(self) -> list[Session]:
+    def sessions(self) -> list[ScientificSession]:
         if self._program is not None:
             return [s[2] for s in self._program.sessions]
         else:
