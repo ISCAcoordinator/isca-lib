@@ -378,6 +378,9 @@ class Room(ISCAItem):
 
         return self.id == other.id
 
+    def __repr__(self) -> str:
+        return f"Room(id={self.id}, name={self.name}, nb_zones={self.nb_zones})"
+
 
 class Program(ISCAObject):
     def __init__(self, timeslots: list[Timeslot], rooms: list[Room]):

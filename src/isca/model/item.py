@@ -137,6 +137,9 @@ class Session(ISCAItem):
     def sort_criterion(self) -> str:
         return self.id
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name})"
+
 
 class ScientificSession(Session):
     def __init__(self, id: str, name: str, papers: list[Paper] | None = []):
