@@ -151,16 +151,13 @@ class Person(ISCAItem):
             A given identifier for the person. This field should only be used for serialisation purposes!
         """
         super().__init__(self._generate_id() if id is None else id)
-        self.firstname: str | None = firstname
-        self.lastname: str = lastname
+        self.firstname: str | None = firstname.strip() if firstname is not None else None
+        self.lastname: str = lastname.strip()
         self.default_affiliation: Affiliation = default_affiliation
         self.middle_initial: str | None = middle_initial if (middle_initial is not None) and middle_initial.strip() else None
         self._roles: set[Role] = roles
-        self.email: str | None = email
+        self.email: str | None = email.lower().strip() if email is not None else None
         self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
-
-        if self.email is not None:
-            self.email = self.email.lower().strip()
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -197,7 +194,7 @@ class Person(ISCAItem):
         """
         first = self.firstname
         last = self.lastname
-        if not first:
+        if (first is None) or (not first):
             return last
 
         author_name = f"{last}, {first}"
