@@ -140,6 +140,9 @@ class Session(ISCAItem):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(id={self.id}, name={self.name})"
 
+    def str(self) -> str:
+        return self.__repr__()
+
 
 class ScientificSession(Session):
     def __init__(self, id: str, name: str, papers: list[Paper] | None = []):
