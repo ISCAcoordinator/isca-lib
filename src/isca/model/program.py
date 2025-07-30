@@ -85,6 +85,15 @@ class Timeslot(AnonymousTimeslot, ISCAItem):
         self.name: str = name
         self.type: TimeslotType = type
 
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Timeslot):
+            return False
+
+        return self.id == other.id
+
     def __repr__(self) -> str:
         date = self.date.strftime("%Y-%m-%d")
         start = self.start.strftime("%H:%M")
