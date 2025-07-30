@@ -89,6 +89,7 @@ class Role(Enum):
     CHAIR = 7
     PROCEEDING_EDITOR = 8
     SETTING_READER = 9
+    SESSION_CHAIR = 10
 
     def __str__(self) -> str:
         """Return the string representation of the role
@@ -387,15 +388,29 @@ class Speaker(Person):
 
 
 class Annuary(ISCAObject):
-    def __init__(self):
+    def __init__(self, alternative_emails: list[tuple[str, str]] | None = None):
         super().__init__()
         self._annuary: set[Person] = set()
         self._email_annuary: dict[str, Person] = dict()
+        self._alternative_emails: dict[str, str] = dict()
+
+        if alternative_emails is not None:
+            for reference_email, alternative_email in alternative_emails:
+                self.add_alternative_email(reference_email, alternative_email)
+
+    def add_alternative_email(self, reference_email: str, alternative_email: str):
+        reference_email = reference_email.strip().lower()
+        alternative_email = alternative_email.strip().lower()
+        self._alternative_emails[alternative_email] = reference_email
+
+    def get_reference_email(self, alternative_email: str) -> str:
+        alternative_email = alternative_email.strip().lower()
+        return self._alternative_emails[alternative_email]
+
+    def is_an_alternative_email(self, email: str) -> bool:
+        return email.strip().lower() in self._alternative_emails
 
     def add(self, person: Person, force: bool = False):
-        if (person.firstname == "Hosein") and (not isinstance(person, Speaker)):
-            raise Exception(repr(person))
-
         # Check if person exist
         email_person = None
         if person.email is not None:
@@ -419,6 +434,12 @@ class Annuary(ISCAObject):
         for person in other._annuary:
             self.add(person, force)
 
+        for alternative_email, _ in other._alternative_emails.items():
+            if alternative_email in self._alternative_emails:
+                self.logger.info(
+                    f"The alternative email <{alternative_email}> already points to <{self._alternative_emails[alternative_email]}> in the current annuary"
+                )
+
     def replace(self, old_person: Person, new_person: Person):
         assert old_person.email is not None
         del self._email_annuary[old_person.email]
@@ -427,6 +448,10 @@ class Annuary(ISCAObject):
         self.add(new_person)
 
     def find_person_by_email(self, email: str) -> Person | None:
+        email = email.lower().strip()
+        if self.is_an_alternative_email(email):
+            email = self.get_reference_email(email)
+
         if email not in self._email_annuary:
             return None
         return self._email_annuary[email]
