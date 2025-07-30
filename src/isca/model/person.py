@@ -388,15 +388,19 @@ class Speaker(Person):
 
 
 class Annuary(ISCAObject):
-    def __init__(self, alternative_emails: list[tuple[str, str]] | None = None):
+    def __init__(self, alternative_emails: dict[str, str] | None = None):
         super().__init__()
         self._annuary: set[Person] = set()
         self._email_annuary: dict[str, Person] = dict()
         self._alternative_emails: dict[str, str] = dict()
 
         if alternative_emails is not None:
-            for reference_email, alternative_email in alternative_emails:
+            for alternative_email, reference_email in alternative_emails.items():
                 self.add_alternative_email(reference_email, alternative_email)
+
+    @property
+    def alternative_emails(self) -> dict[str, str]:
+        return self._alternative_emails
 
     def add_alternative_email(self, reference_email: str, alternative_email: str):
         reference_email = reference_email.strip().lower()
@@ -409,6 +413,15 @@ class Annuary(ISCAObject):
 
     def is_an_alternative_email(self, email: str) -> bool:
         return email.strip().lower() in self._alternative_emails
+
+    def update_alternative_emails(self, alternative_emails: dict[str, str]):
+        for alternative_email, reference_email in alternative_emails.items():
+            if alternative_email in self._alternative_emails:
+                self.logger.info(
+                    f"The alternative email <{alternative_email}> already points to <{self._alternative_emails[alternative_email]}> in the current annuary"
+                )
+            else:
+                self.add_alternative_email(reference_email, alternative_email)
 
     def add(self, person: Person, force: bool = False):
         # Check if person exist
@@ -430,15 +443,12 @@ class Annuary(ISCAObject):
             if person.email is not None:
                 self._email_annuary[person.email] = person
 
-    def update(self, other: "Annuary", force: bool = False):
+    def update(self, other: "Annuary", force: bool = False, ignore_alternative: bool = False):
         for person in other._annuary:
             self.add(person, force)
 
-        for alternative_email, _ in other._alternative_emails.items():
-            if alternative_email in self._alternative_emails:
-                self.logger.info(
-                    f"The alternative email <{alternative_email}> already points to <{self._alternative_emails[alternative_email]}> in the current annuary"
-                )
+        if not ignore_alternative:
+            self.update_alternative_emails(other._alternative_emails)
 
     def replace(self, old_person: Person, new_person: Person):
         assert old_person.email is not None
