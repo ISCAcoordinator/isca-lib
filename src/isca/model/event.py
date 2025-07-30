@@ -28,6 +28,19 @@ class Event(ISCAItem):
         self.url: str | None = url
         self.theme: dict[str, object] | None = theme
 
+    @property
+    def str_dates(self) -> str:
+        if self.start_date == self.end_date:
+            return self.start_date.strftime("%d/%m/%Y")
+
+        if self.start_date.month == self.end_date.month:
+            return self.start_date.strftime("%d") + "-" + self.end_date.strftime("%d/%m/%Y")
+
+        if self.start_date.year == self.end_date.year:
+            return self.start_date.strftime("%d/%m") + "-" + self.end_date.strftime("%d/%m/%Y")
+
+        return self.start_date.strftime("%d/%m/%Y") + " -- " + self.end_date.strftime("%d/%m/%Y")
+
 
 class Conference(Event):
     def __init__(
