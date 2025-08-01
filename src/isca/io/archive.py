@@ -9,6 +9,7 @@ import shutil
 # Data loading
 import json
 from isca.model.core import ISCAObject
+from isca.model.program import PresentationSession
 import pandas as pd
 
 # Model helpers
@@ -298,9 +299,10 @@ class ArchiveInputSerialiser(ISCAObject):
             f_sessions.write("\n")
 
             for session in conf.sessions:
-                papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join([str(paper.id) for paper in session.papers])
-                f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
-                f_sessions.write("\n")
+                if isinstance(session, ScientificSession):
+                    papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join([str(paper.id) for paper in session.papers])
+                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
+                    f_sessions.write("\n")
 
         # Initialise using conference info
         dict_out = {
