@@ -160,6 +160,13 @@ class Person(ISCAItem):
         self.email: str | None = email.lower().strip() if email is not None else None
         self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
 
+        # Other refinement
+        if (self.firstname is not None) and (self.firstname.isupper() or self.firstname.islower()):
+            self.firstname = self.firstname.title()
+
+        if (self.lastname is not None) and (self.lastname.isupper() or self.lastname.islower()):
+            self.lastname = self.lastname.title()
+
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
 
@@ -285,6 +292,33 @@ class Person(ISCAItem):
 
         return str_person
 
+    def str_affiliations(self, short=False, markers=False) -> str:
+        affiliations = set()
+        if not self.paper_affiliations:
+            # Add the default affiliation
+            if short:
+                affiliation = self.default_affiliation.institute
+            elif markers:
+                affiliation = repr(self.default_affiliation)
+            else:
+                affiliation = str(self.default_affiliation)
+
+            affiliations.add(affiliation)
+        else:
+            # add all the potentiation affiliations
+            for affiliation_list in self.paper_affiliations.values():
+                for affiliation in affiliation_list:
+                    if short:
+                        affiliation = affiliation.institute
+                    elif markers:
+                        affiliation = repr(affiliation)
+                    else:
+                        affiliation = str(affiliation)
+
+                    affiliations.add(affiliation)
+
+        return "; ".join(affiliations)
+
     def add_paper_affiliation(self, paper_id: str, affiliation: Affiliation):
         if paper_id not in self.paper_affiliations:
             self.paper_affiliations[paper_id] = list()
@@ -384,6 +418,7 @@ class Speaker(Person):
             person.paper_affiliations,
             person.middle_initial,
         )
+
         return speaker
 
 
@@ -425,19 +460,20 @@ class Annuary(ISCAObject):
 
     def add(self, person: Person, force: bool = False):
         # Check if person exist
-        email_person = None
-        if person.email is not None:
-            email_person = self.find_person_by_email(person.email)
+        old_person = None
+        if person in self._annuary:
+            for old_person in self._annuary:
+                if old_person == person:
+                    break
 
-        if (person in self._annuary) or (email_person is not None):
+        elif person.email is not None:
+            old_person = self.find_person_by_email(person.email)
+
+        if old_person is not None:
             if not force:
                 return
 
-            self._annuary.remove(person)
-            self._annuary.add(person)
-            if person.email is not None:
-                self._email_annuary[person.email] = person
-
+            self.replace(old_person, person)
         else:
             self._annuary.add(person)
             if person.email is not None:

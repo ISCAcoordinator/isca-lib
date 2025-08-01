@@ -35,7 +35,6 @@ class Paper(ISCAItem):
         abstract: str | None = None,
         pdf_file: pathlib.Path | str | None = None,
         reviewers: list[Person] | None = None,
-        alternative_affiliations: dict[Person, Affiliation] | None = None,
         track: str | None = None,
         metadata_from_pdf: bool = False,
         resource: str | None = None,
@@ -54,25 +53,24 @@ class Paper(ISCAItem):
             The path to the PDF file of the paper (None, if not PDF) [default: None]
         reviewers : list[Person], optional
             The list of reviewers [default: empty list]
-        alternative_affiliations : dict[Person, Affiliation], optional
-            The alternative affiliations for the authors of the paper [default: empty dict]
         """
         super().__init__(id)
 
         self.title: str = title
-        self.authors: list[Person] = authors
-        self.abstract = abstract
+        self._authors: list[Person] = authors
+        self.abstract = abstract.strip() if abstract is not None else None
         self._pdf_file: pathlib.Path | None = None
         self.reviewers: list[Person] = reviewers if reviewers is not None else []
-        self.alternative_affiliations: dict[Person, Affiliation] = (
-            alternative_affiliations if alternative_affiliations is not None else dict()
-        )
         self.metadata_from_pdf: bool = metadata_from_pdf
         self.track: str | None = track
         self.resource: str | None = resource
         self._id: str | None = id
 
         self.pdf_file = pdf_file
+
+    @property
+    def authors(self) -> list[Person]:
+        return self._authors
 
     @property
     def pdf_file(self) -> pathlib.Path | None:
@@ -91,9 +89,26 @@ class Paper(ISCAItem):
 
         self._pdf_file = pdf_file
 
+    def replace_author(self, current_author: Person | int, new_author: Person):
+
+        # Ensure the provided person is an actual author
+        if isinstance(current_author, Person):
+            idx_author = self.authors.index(current_author)
+            if idx_author < 0:
+                raise Exception(f'The wanted person "{current_author}" is not an author of the paper "{self.id}"')
+        else:
+            if current_author >= len(self._authors):
+                raise Exception(
+                    f'"{self.id}" only have {len(self._authors)} authors and author index {current_author} has been asked'
+                )
+            idx_author = current_author
+
+        # Replace the actual author in the list of authors
+        current_author = self._authors[idx_author]
+        self._authors[idx_author] = new_author
+
     def __str__(self):
         paper = f"[{self.id}] {self.title}\n"
-        print(self.authors)
         for author in self.authors:
             paper += f"  - {author}\n"
 
