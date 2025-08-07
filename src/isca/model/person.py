@@ -425,7 +425,7 @@ class Speaker(Person):
 class Annuary(ISCAObject):
     def __init__(self, alternative_emails: dict[str, str] | None = None):
         super().__init__()
-        self._annuary: set[Person] = set()
+        self._annuary: dict[int, Person] = dict()
         self._email_annuary: dict[str, Person] = dict()
         self._alternative_emails: dict[str, str] = dict()
 
@@ -461,10 +461,8 @@ class Annuary(ISCAObject):
     def add(self, person: Person, force: bool = False):
         # Check if person exist
         old_person = None
-        if person in self._annuary:
-            for old_person in self._annuary:
-                if old_person == person:
-                    break
+        if hash(person) in self._annuary:
+            old_person = self._annuary[hash(person)]
 
         elif person.email is not None:
             old_person = self.find_person_by_email(person.email)
@@ -475,12 +473,12 @@ class Annuary(ISCAObject):
 
             self.replace(old_person, person)
         else:
-            self._annuary.add(person)
+            self._annuary[hash(person)] = person
             if person.email is not None:
                 self._email_annuary[person.email] = person
 
     def update(self, other: "Annuary", force: bool = False, ignore_alternative: bool = False):
-        for person in other._annuary:
+        for person in other._annuary.values():
             self.add(person, force)
 
         if not ignore_alternative:
@@ -489,7 +487,7 @@ class Annuary(ISCAObject):
     def replace(self, old_person: Person, new_person: Person):
         assert old_person.email is not None
         del self._email_annuary[old_person.email]
-        self._annuary.remove(old_person)
+        del self._annuary[hash(old_person)]
 
         self.add(new_person)
 
@@ -504,7 +502,7 @@ class Annuary(ISCAObject):
 
     def find_person_by_name(self, firstname: str, lastname: str, middle_initial: str | None = None) -> set[Person]:
         set_person = set()
-        for person in self._annuary:
+        for person in self._annuary.values():
             if (person.firstname != firstname) or (person.lastname != lastname):
                 continue
 
@@ -518,7 +516,7 @@ class Annuary(ISCAObject):
     @property
     def reviewers(self) -> set[Person]:
         reviewers = set()
-        for p in self._annuary:
+        for p in self._annuary.values():
             if p.validate_roles(set([Role.REVIEWER])):
                 reviewers.add(p)
         return reviewers
