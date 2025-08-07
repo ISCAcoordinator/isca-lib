@@ -361,20 +361,29 @@ class PosterSession(PresentationSession):
 
 
 class Room(ISCAItem):
-    def __init__(self, id: str, name: str, type: str, nb_zones: int = 1):
+    def __init__(self, id: str, name: str, type: str, nb_zones: int | None = 1, zones: list[str] | None = None):
         super().__init__(id)
         self.name: str = name
         self.type: str = type
-        self._nb_zones: int = nb_zones
+        self._zones: list[str] = ["Z1"]
+        if (zones is not None) and (nb_zones is not None):
+            raise Exception(f"[{id}] either the number of zones OR the list of zones should be given but not both")
+        elif (nb_zones is not None) and (nb_zones > 1):
+            self._zones = [f"Z{i_zone}" for i_zone in range(1, nb_zones + 1)]
+        elif zones is not None:
+            self._zones = zones
 
     @property
     def nb_zones(self) -> int:
-        return self._nb_zones
+        return len(self._zones)
+
+    @property
+    def zones(self) -> list[str]:
+        return self._zones.copy()
 
     def __str__(self) -> str:
         str = f"{self.name}"
-        if self.nb_zones is not None:
-            str += f" (nb_zones={self._nb_zones})"
+        str += f" (zones={self.zones})"
 
         return str + f" [{self.type}]"
 
@@ -396,7 +405,28 @@ class Program(ISCAObject):
         super().__init__()
         self._timeslots: list[Timeslot] = sorted(timeslots, key=lambda x: x.start)
         self._rooms: list[Room] = rooms
-        self._program_matrix: npt.NDArray[Session | None] = np.full((len(self._timeslots), len(self._rooms)), None)
+        self._program_matrix: npt.NDArray[list[Session]] = np.full((len(self._timeslots), len(self._rooms)), None)
+
+    @property
+    def timeslots(self) -> list[Timeslot]:
+        return copy.deepcopy(self._timeslots)
+
+    @property
+    def rooms(self) -> list[Room]:
+        return copy.deepcopy(self._rooms)
+
+    @property
+    def sessions(self) -> list[tuple[Session, Timeslot, Room, int]]:
+        sessions = []
+        for timeslot_idx, timeslot in enumerate(self._timeslots):
+            timeslot_content = self._program_matrix[timeslot_idx]
+            for room_idx, room in enumerate(self._rooms):
+                if timeslot_content[room_idx] is not None:
+                    for zone_idx, session in enumerate(timeslot_content[room_idx]):
+                        if session is not None:
+                            sessions.append((session, timeslot, room, zone_idx))
+
+        return sessions
 
     def get_timeslots(self, day: datetime.date | None = None) -> list[Timeslot]:
         if day is None:
@@ -409,7 +439,7 @@ class Program(ISCAObject):
 
         return sorted(timeslots, key=lambda x: x.start)
 
-    def get_day_sessions(self, day: datetime.date) -> list[tuple[Session, Timeslot, Room]]:
+    def get_day_sessions(self, day: datetime.date) -> list[tuple[Session, Timeslot, Room, int]]:
         sessions = []
         timeslots = self.get_timeslots(day)
         for timeslot in timeslots:
@@ -417,12 +447,13 @@ class Program(ISCAObject):
             timeslot_content = self._program_matrix[timeslot_idx]
             for room_idx, room in enumerate(self._rooms):
                 if timeslot_content[room_idx] is not None:
-                    for session in timeslot_content[room_idx]:
-                        sessions.append((session, timeslot, room))
+                    for zone_idx, session in enumerate(timeslot_content[room_idx]):
+                        if session is not None:
+                            sessions.append((session, timeslot, room, zone_idx))
 
         return sorted(sessions, key=lambda x: str(x[1].start) + "_" + str(x[0].id))
 
-    def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, list[Session]]:
+    def get_timeslot_sessions(self, timeslot: Timeslot | int) -> dict[Room, dict[int, Session]]:
         sessions = dict()
         if isinstance(timeslot, Timeslot):
             timeslot_idx = self._timeslots.index(timeslot)  # NOTE: could be improved to be faster
@@ -431,12 +462,18 @@ class Program(ISCAObject):
 
         timeslot_content = self._program_matrix[timeslot_idx]
         for room_idx, room in enumerate(self._rooms):
-            if timeslot_content[room_idx] is not None:
-                sessions[room] = timeslot_content[room_idx]
+            if timeslot_content[room_idx] is None:
+                continue
+
+            for zone_idx, session in enumerate(timeslot_content[room_idx]):
+                if session is not None:
+                    if room not in sessions:
+                        sessions[room] = dict()
+                    sessions[room][zone_idx] = session
 
         return sessions
 
-    def get_session(self, timeslot: Timeslot | int, room: Room | int, zone_idx: int = 0):
+    def get_session(self, timeslot: Timeslot | int, room: Room | int, zone: int | str = 0) -> Session:
         if isinstance(timeslot, int):
             timeslot_idx = timeslot
         else:
@@ -448,14 +485,19 @@ class Program(ISCAObject):
         else:
             room_idx = self._rooms.index(room)
 
-        if zone_idx >= room.nb_zones:
-            raise Exception(
-                f'There are not enough zones (nb_zones={room.nb_zones}) in the room as you asked for zone "{zone_idx}"'
-            )
+        if isinstance(zone, int) and (zone >= room.nb_zones):
+            raise Exception(f'There are not enough zones (nb_zones={room.nb_zones}) in the room as you asked for zone "{zone}"')
+        elif isinstance(zone, str):
+            zone_idx = room.zones.index(zone)
+            if zone_idx == -1:
+                raise Exception(f'The zone "{zone}" is not in the room {room}')
+            zone = zone_idx
 
-        return self._program_matrix[timeslot_idx, room_idx][zone_idx]
+        return self._program_matrix[timeslot_idx, room_idx][zone]
 
-    def add_session(self, timeslot: Timeslot | int, room: Room | int, session: Session) -> Session | None:
+    def add_session(
+        self, timeslot: Timeslot | int, room: Room | int, session: Session, zone: int | str | None = None
+    ) -> Session | None:
         if isinstance(timeslot, int):
             timeslot_idx = timeslot
         else:
@@ -467,88 +509,109 @@ class Program(ISCAObject):
         else:
             room_idx = self._rooms.index(room)
 
-        cur_session = [session]
-        prev_sessions = self._program_matrix[timeslot_idx, room_idx]
-        if prev_sessions is not None:
-            if len(prev_sessions) >= room.nb_zones:
-                raise Exception(
-                    f"There is already a session for the timeslot {timeslot} in the room {room} and replace was not forced. Here is the session: {prev_sessions}"
-                )
+        #
+        if self._program_matrix[timeslot_idx, room_idx] is None:
+            self._program_matrix[timeslot_idx, room_idx] = []
+
+        if zone is None:
+            prev_session = None
+
+            if len(self._program_matrix[timeslot_idx, room_idx]) >= room.nb_zones:
+                raise Exception(f'All the slots of the room "{room}" are occupied, don\'t know where to add the session')
+
+            allocated = False
+            for i_zone in range(len(self._program_matrix[timeslot_idx, room_idx])):
+                if self._program_matrix[timeslot_idx, room_idx][i_zone] is None:
+                    self._program_matrix[timeslot_idx, room_idx][i_zone] = session
+                    allocated = True
+                    break
+
+            if not allocated:
+                self._program_matrix[timeslot_idx, room_idx].append(session)
+
+        else:
+            if isinstance(zone, str):
+                zone_idx = room.zones.index(zone)
+                if zone_idx == -1:
+                    raise Exception(f'The zone "{zone}" is not in the room {room}')
+                zone = zone_idx
+            elif zone >= room.nb_zones:
+                raise Exception("The room doesn't have any zones")
+
+            if len(self._program_matrix[timeslot_idx, room_idx]) <= zone:
+                prev_session = None
+                for _ in range(len(self._program_matrix[timeslot_idx, room_idx]), zone):
+                    self._program_matrix[timeslot_idx, room_idx].append(None)
+                self._program_matrix[timeslot_idx, room_idx].append(session)
             else:
-                cur_session = prev_sessions.copy()
-                cur_session.append(session)
+                prev_session = self._program_matrix[timeslot_idx, room_idx][zone]
+                self._program_matrix[timeslot_idx, room_idx][zone] = session
 
-        self._program_matrix[timeslot_idx, room_idx] = cur_session
-        return prev_sessions
+        return prev_session
 
-    def remove_session(self, timeslot: Timeslot, room: Room) -> Session | None:
+    def remove_session(self, timeslot: Timeslot, room: Room, zone: int | str | None = None) -> Session | None:
+
+        raise NotImplementedError("Not yet available")
+        if (room.nb_zones > 1) and (zone is None):
+            raise Exception(f"The room {room} has multiple zones, please indicate in which one the session your to remove is")
+
         timeslot_idx = self._timeslots.index(timeslot)
         room_idx = self._rooms.index(room)
+        slots = self._program_matrix[timeslot_idx, room_idx]
 
-        session = self._program_matrix[timeslot_idx, room_idx]
         self._program_matrix[timeslot_idx, room_idx] = None
-        return session
+        return slots
 
     def move_session(
-        self, src_timeslot: Timeslot, src_room: Room, dest_timeslot: Timeslot, dest_room: Room
+        self,
+        src_timeslot: Timeslot,
+        src_room: Room,
+        dest_timeslot: Timeslot,
+        dest_room: Room,
+        src_zone: int | str | None = None,
+        dest_zone: int | str | None = None,
     ) -> PresentationSession | None:
+        raise NotImplementedError("not avilable yet")
         session = self.remove_session(src_timeslot, src_room)
         if session is None:
             return None
         self.add_session(dest_timeslot, dest_room, session)
 
-    @property
-    def timeslots(self) -> list[Timeslot]:
-        return copy.deepcopy(self._timeslots)
-
-    @property
-    def rooms(self) -> list[Room]:
-        return copy.deepcopy(self._rooms)
-
-    @property
-    def sessions(self) -> list[tuple[Timeslot, Room, Session]]:
-        sessions = []
-        for timeslot_idx, timeslot in enumerate(self._timeslots):
-
-            timeslot_content = self._program_matrix[timeslot_idx]
-            for room_idx, room in enumerate(self._rooms):
-                if timeslot_content[room_idx] is not None:
-                    for session in timeslot_content[room_idx]:
-                        sessions.append((timeslot, room, session))
-
-        return sessions
-
     def select_sessions(
-        self, criterion: Callable[[Timeslot, Room, Session], bool] | None
-    ) -> list[tuple[Timeslot, Room, Session]]:
+        self, criterion: Callable[[Session, Timeslot, Room, int], bool] | None
+    ) -> list[tuple[Session, Timeslot, Room, int]]:
         if criterion is None:
             return self.sessions
 
         sessions = []
         for timeslot_idx, timeslot in enumerate(self._timeslots):
-
             timeslot_content = self._program_matrix[timeslot_idx]
             for room_idx, room in enumerate(self._rooms):
                 if timeslot_content[room_idx] is not None:
-                    for session in timeslot_content[room_idx]:
-                        if criterion(timeslot, room, session):
-                            sessions.append((timeslot, room, session))
+                    for zone_idx, session in enumerate(timeslot_content[room_idx]):
+                        if session is not None:
+                            if criterion(session, timeslot, room, zone_idx):
+                                sessions.append((session, timeslot, room, zone_idx))
 
         return sessions
 
-    def get_information(self, wanted_presentation: Presentation) -> tuple[Timeslot, Room]:
+    def get_information(self, wanted_presentation: Presentation) -> tuple[Timeslot, Room, int]:
         info = None
         for timeslot_idx, timeslot in enumerate(self._timeslots):
             timeslot_content = self._program_matrix[timeslot_idx]
             for room_idx, room in enumerate(self._rooms):
                 if timeslot_content[room_idx] is not None:
-                    for session in timeslot_content[room_idx]:
-                        if not isinstance(session, PresentationSession):
-                            continue
+                    for slots in timeslot_content[room_idx]:
+                        for zone_idx in range(slots):
+                            if not isinstance(slots[zone_idx], PresentationSession):
+                                continue
 
-                        for cur_presentation in session.presentations:
-                            if cur_presentation == wanted_presentation:
-                                info = (timeslot, room)
+                            for cur_presentation in slots[zone_idx].presentations:
+                                if cur_presentation == wanted_presentation:
+                                    info = (timeslot, room, zone_idx)
+                                    break
+
+                            if info is not None:
                                 break
 
                         if info is not None:
@@ -569,7 +632,7 @@ class Program(ISCAObject):
         authors2presentations = dict()
         sessions = self.sessions
         for session_info in sessions:
-            _, _, session = session_info
+            session, _, _, _ = session_info
             if not isinstance(session, PresentationSession):
                 continue
 
