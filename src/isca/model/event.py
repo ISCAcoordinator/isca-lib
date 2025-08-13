@@ -174,7 +174,7 @@ class Conference(Event):
     @property
     def sessions(self) -> list[Session]:
         if self._program is not None:
-            return [s[0] for s in self._program.sessions]
+            return list(set([s[0] for s in self._program.sessions]))
         else:
             return self._sessions.copy()
 
