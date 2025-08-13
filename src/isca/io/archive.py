@@ -9,7 +9,7 @@ import shutil
 # Data loading
 import json
 from isca.model.core import ISCAObject
-from isca.model.program import PresentationSession
+from isca.model.program import KeynoteSession, PresentationSession
 import pandas as pd
 
 # Model helpers
@@ -260,6 +260,7 @@ class ArchiveInputSerialiser(ISCAObject):
 
         # Create session file
         seen_papers = []
+        keynotes = []
         with open(output_dir / "sessions.txt", "w") as f_sessions:
             f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
             f_sessions.write("\n")
@@ -272,6 +273,14 @@ class ArchiveInputSerialiser(ISCAObject):
                     seen_papers += session_papers
                     papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join(session_papers)
                     f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
+                    f_sessions.write("\n")
+                elif isinstance(session, KeynoteSession):
+                    presentations = []
+                    for keynote_presentation in session.presentations:
+                        presentations.append(str(keynote_presentation.id))
+                        keynotes.append(keynote_presentation)
+                    presentations = ARCHIVE_INPUT_DATA_PAPER_SEP.join(presentations)
+                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([str(session.id) + " - " + session.name, presentations]))
                     f_sessions.write("\n")
 
         # Create paper file
@@ -312,6 +321,35 @@ class ArchiveInputSerialiser(ISCAObject):
                 # Save PDF
                 if paper.pdf_file is not None:
                     shutil.copy(paper.pdf_file.resolve(), pdfs_dir / f"{paper_id}.pdf")
+
+            for keynote in keynotes:
+                list_presenters = []
+                for presenter in keynote.presenters:
+
+                    cur_presenter = ""
+                    if presenter.firstname:
+                        cur_presenter += presenter.firstname + " "
+
+                    if presenter.middle_initial:
+                        cur_presenter += presenter.middle_initial + " "
+
+                    cur_presenter += f"{{{presenter.lastname}}}"
+                    list_presenters.append(cur_presenter)
+
+                presenters = ARCHIVE_INPUT_DATA_PAPER_SEP.join(list_presenters)
+                f_papers.write(ARCHIVE_INPUT_DATA_SEP.join([str(keynote.id), keynote.title, presenters]))
+                f_papers.write("\n")
+
+                # Save abstract
+                if keynote.abstract is None:
+                    raise Exception(f"{keynote.id} doesn't have any abstract, this is incompatible with the ISCA archive")
+
+                with open(abstracts_dir / f"{keynote.id}.txt", "w") as f_abstract:
+                    f_abstract.write(keynote.abstract)
+
+                # # Save PDF
+                # if keynote.pdf_file is not None:
+                #     shutil.copy(keynote.pdf_file.resolve(), pdfs_dir / f"{keynote.id}.pdf")
 
         # Initialise using conference info
         dict_out = {
