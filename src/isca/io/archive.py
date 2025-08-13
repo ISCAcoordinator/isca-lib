@@ -251,7 +251,7 @@ class ArchiveInputSerialiser(ISCAObject):
 
         return conf
 
-    def dump(self, conf: Conference, output_dir: pathlib.Path):
+    def dump(self, conf: Conference, output_dir: pathlib.Path, booklet_path: pathlib.Path | None = None):
         # Prepare directory
         abstracts_dir = output_dir / "abstracts"
         abstracts_dir.mkdir(exist_ok=True, parents=True)
@@ -375,6 +375,10 @@ class ArchiveInputSerialiser(ISCAObject):
 
         if conf.serie is not None:
             dict_out["series"] = conf.serie
+
+        if (booklet_path is not None) and booklet_path.is_file():
+            shutil.copy(booklet_path.resolve(), output_dir / "booklet.pdf")
+            dict_out["intro"] = "./booklet.pdf"
 
         with open(output_dir / "conference.txt", "w") as f_conf:
             for k, v in dict_out.items():
