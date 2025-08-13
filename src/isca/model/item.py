@@ -89,6 +89,9 @@ class Paper(ISCAItem):
 
         self._pdf_file = pdf_file
 
+    def replace_authors(self, authors: list[Person]):
+        self._authors = authors
+
     def replace_author(self, current_author: Person | int, new_author: Person):
 
         # Ensure the provided person is an actual author

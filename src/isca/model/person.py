@@ -347,8 +347,6 @@ class Person(ISCAItem):
 
     def __str__(self) -> str:
         last_name = self.lastname
-        if " " in last_name:
-            last_name = f"{{{last_name}}}"
 
         if not self.firstname:
             return last_name
@@ -529,7 +527,7 @@ class Annuary(ISCAObject):
 
     def __str__(self) -> str:
         output = ""
-        for person in self._annuary:
+        for person in self._annuary.values():
             output += f"- {person}\n"
         return output
 
