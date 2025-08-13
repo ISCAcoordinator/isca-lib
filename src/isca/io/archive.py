@@ -258,12 +258,32 @@ class ArchiveInputSerialiser(ISCAObject):
         pdfs_dir = output_dir / "pdfs"
         pdfs_dir.mkdir(exist_ok=True, parents=True)
 
+        # Create session file
+        seen_papers = []
+        with open(output_dir / "sessions.txt", "w") as f_sessions:
+            f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
+            f_sessions.write("\n")
+
+            for session in conf.sessions:
+                if isinstance(session, ScientificSession) and session.papers:
+                    session_papers = []
+                    for paper in session.papers:
+                        session_papers.append(str(paper.id))
+                    seen_papers += session_papers
+                    papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join(session_papers)
+                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
+                    f_sessions.write("\n")
+
         # Create paper file
         with open(output_dir / "papers.txt", "w") as f_papers:
             f_papers.write(ARCHIVE_INPUT_DATA_SEP.join(["id", "title", "authors"]))
             f_papers.write("\n")
 
             for paper_id, paper in conf.papers.items():
+
+                if str(paper_id) not in seen_papers:
+                    self.logger.warning(f'The paper "{paper_id}" is not part of any sessions, check if it has been withdrawn')
+                    continue
 
                 list_authors = []
                 for author in paper.authors:
@@ -292,17 +312,6 @@ class ArchiveInputSerialiser(ISCAObject):
                 # Save PDF
                 if paper.pdf_file is not None:
                     shutil.copy(paper.pdf_file.resolve(), pdfs_dir / f"{paper_id}.pdf")
-
-        # Create session file
-        with open(output_dir / "sessions.txt", "w") as f_sessions:
-            f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
-            f_sessions.write("\n")
-
-            for session in conf.sessions:
-                if isinstance(session, ScientificSession):
-                    papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join([str(paper.id) for paper in session.papers])
-                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
-                    f_sessions.write("\n")
 
         # Initialise using conference info
         dict_out = {
