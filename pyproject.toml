@@ -10,7 +10,7 @@ readme = {file="README.md", content-type = "text/markdown"}
 authors = [
    {name="Sébastien Le Maguer", email="sebastien.lemaguer@helsinki.fi"}
 ]
-license = "LicenseRef-Proprietary"
+license = {text = "LicenseRef-Proprietary"}
 keywords = []
 requires-python = ">=3.11"
 classifiers = [
