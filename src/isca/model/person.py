@@ -160,12 +160,12 @@ class Person(ISCAItem):
         self.email: str | None = email.lower().strip() if email is not None else None
         self.paper_affiliations: dict[str, list[Affiliation]] = paper_affiliations if paper_affiliations is not None else dict()
 
-        # Other refinement
-        if (self.firstname is not None) and (self.firstname.isupper() or self.firstname.islower()):
-            self.firstname = self.firstname.title()
+        # # Other refinement
+        # if (self.firstname is not None) and (self.firstname.isupper() or self.firstname.islower()):
+        #     self.firstname = self.firstname.title()
 
-        if (self.lastname is not None) and (self.lastname.isupper() or self.lastname.islower()):
-            self.lastname = self.lastname.title()
+        # if (self.lastname is not None) and (self.lastname.isupper() or self.lastname.islower()):
+        #     self.lastname = self.lastname.title()
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -538,8 +538,7 @@ class Annuary(ISCAObject):
         annuary = Annuary()
         ignored_counter = 0
         total_counter = len(self._annuary)
-        sorted_annuary = sorted(list(self._annuary), key=lambda x: x.str_sorting_by_last_name())
-        for person in sorted_annuary:
+        for person in self._annuary.values():
             if select_criterion(person):
                 annuary.add(person)
             else:

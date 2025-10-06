@@ -323,7 +323,7 @@ class ArchiveInputSerialiser(ISCAObject):
                     shutil.copy(paper.pdf_file.resolve(), pdfs_dir / f"{paper_id}.pdf")
 
             for keynote in keynotes:
-                list_presenters = []
+                presenter_names = []
                 for presenter in keynote.presenters:
 
                     cur_presenter = ""
@@ -334,9 +334,9 @@ class ArchiveInputSerialiser(ISCAObject):
                         cur_presenter += presenter.middle_initial + " "
 
                     cur_presenter += f"{{{presenter.lastname}}}"
-                    list_presenters.append(cur_presenter)
+                    presenter_names.append(cur_presenter)
 
-                presenters = ARCHIVE_INPUT_DATA_PAPER_SEP.join(list_presenters)
+                presenters = ARCHIVE_INPUT_DATA_PAPER_SEP.join(presenter_names)
                 f_papers.write(ARCHIVE_INPUT_DATA_SEP.join([str(keynote.id), keynote.title, presenters]))
                 f_papers.write("\n")
 
@@ -345,11 +345,14 @@ class ArchiveInputSerialiser(ISCAObject):
                     raise Exception(f"{keynote.id} doesn't have any abstract, this is incompatible with the ISCA archive")
 
                 with open(abstracts_dir / f"{keynote.id}.txt", "w") as f_abstract:
-                    f_abstract.write(keynote.abstract)
+                    abstract_content = "<h4>Abstract</h4>\n"
+                    abstract_content += f"<p>\n{keynote.abstract}</p>\n"
+                    abstract_content += "<h4>Biography</h4>\n"
 
-                # # Save PDF
-                # if keynote.pdf_file is not None:
-                #     shutil.copy(keynote.pdf_file.resolve(), pdfs_dir / f"{keynote.id}.pdf")
+                    abstract_content += "<p>\n"
+                    abstract_content += "</p>\n<p>\n".join([p.biography for p in keynote.presenters])
+                    abstract_content += "</p>\n"
+                    f_abstract.write(abstract_content)
 
         # Initialise using conference info
         dict_out = {
