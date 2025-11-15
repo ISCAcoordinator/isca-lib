@@ -42,6 +42,13 @@ class Affiliation:
         self.institute: str = institute
 
     def __repr__(self) -> str:
+        """Get a string representation of the affiliation
+
+        Returns
+        -------
+        str
+            The string representation of the affiliation
+        """
         list_elts = []
         if self.department is not None:
             list_elts.append("[" + self.department + "]")
@@ -52,6 +59,13 @@ class Affiliation:
         return ", ".join(list_elts)
 
     def __str__(self) -> str:
+        """Get a string representation of the affiliation
+
+        Returns
+        -------
+        str
+            The string representation of the affiliation
+        """
         list_elts = []
         if self.department is not None:
             list_elts.append(self.department)
@@ -62,13 +76,41 @@ class Affiliation:
         return ", ".join(list_elts)
 
     def short_str(self) -> str:
+        """Get a short string representation of the affiliation
+
+        Returns
+        -------
+        str
+            The shotr string representation of the affiliation
+        """
         return self.institute
 
     def to_serie(self) -> pd.Series:
+        """Helper to convert the class to a pandas Serie(s)
+
+        Returns
+        -------
+        pd.Series
+            the pandas Serie representation of the affiliation
+        """
+
         return pd.Series({"departement": self.department, "institute": self.institute, "country": self.country})
 
     @classmethod
-    def from_serie(cls, serie: pd.Series) -> "Affiliation":  # NOTE: typing return is a string until we move toward python 3.14
+    def from_serie(cls, serie: pd.Series) -> "Affiliation":
+        """Helper to create an affiliation from a pandas Serie(s)
+
+        Parameters
+        ----------
+        serie : pd.Series
+            The pandas Serie(s) to be converted to an Affiliation
+
+        Returns
+        -------
+        Affiliation:
+            The resulting Affiliation object
+
+        """
         department = str(serie["department"]) if "department" in serie else None
         institute = str(serie["institute"])
         country = str(serie["country"]) if "country" in serie else None
@@ -104,6 +146,13 @@ class Role(Enum):
 
 class Person(ISCAItem):
     """An affiliation to be associated to a person
+
+    Class Attributes
+    ----------------
+    counter: int
+        The counter used to generate an automatic ID
+    ROLE_SEP: str
+        The separator used
 
     Attributes
     ----------
@@ -166,6 +215,8 @@ class Person(ISCAItem):
 
         # if (self.lastname is not None) and (self.lastname.isupper() or self.lastname.islower()):
         #     self.lastname = self.lastname.title()
+
+        self.logger.warning("ok go")
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
