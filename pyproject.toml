@@ -26,7 +26,8 @@ dependencies = [
 dev = [
   "pre-commit",
   "black",
-  "basedpyright"
+  "basedpyright",
+  "pytest"
 ]
 [project.urls]
 Homepage = "https://github.com/ISCACoordinator/isca"
