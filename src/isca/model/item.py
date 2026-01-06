@@ -1,5 +1,5 @@
-"""This module provides the base elements manipulated by any ISCA event
-"""
+"""This module provides the base elements manipulated by any ISCA event"""
+
 import pathlib
 
 from .core import ISCAItem
@@ -62,14 +62,12 @@ class Paper(ISCAItem):
         self.title: str = title
         self._authors: list[Person] = authors
         self.abstract = abstract.strip() if abstract is not None else None
-        self._pdf_file: pathlib.Path | None = None
+        self._pdf_file: pathlib.Path | None = pathlib.Path(pdf_file) if pdf_file is not None else None
         self.reviewers: list[Person] = reviewers if reviewers is not None else []
         self.metadata_from_pdf: bool = metadata_from_pdf
         self.track: str | None = track
         self.resource: str | None = resource
         self._id: str | None = id
-
-        self.pdf_file = pdf_file
 
     @property
     def authors(self) -> list[Person]:

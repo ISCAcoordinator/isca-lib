@@ -463,7 +463,7 @@ class Conference(Event):
 
         return self._authors2papers[author]
 
-    def _resolve_author_paper_association(self):
+    def resolve_author_paper_association(self):
         """Update the authors/papers associations using the dataset of papers of the conference"""
         self._authors2papers = dict()
         for paper in self._papers.values():

@@ -580,13 +580,11 @@ class PresentationSession(ScientificSession):
             raise ValueError(f'"{presentation_out.id}" is not part of the session, so it can\'t be replaced')
         self._presentations[idx] = presentation_in
 
-    def start_presentation(self, _: Presentation | int) -> datetime.datetime:
-        raise NotImplementedError("this method should be implemented in the subclass")
-        # return self.start
+    def start_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+        return self.start
 
-    def end_presentation(self, _: Presentation | int) -> datetime.datetime:
-        raise NotImplementedError("this method should be implemented in the subclass")
-        # return self.end
+    def end_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+        return self.end
 
     def sort_criterion(self) -> str:
         """Generates the criterion used to sort different sessions

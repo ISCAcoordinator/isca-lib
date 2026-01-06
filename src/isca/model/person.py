@@ -176,7 +176,7 @@ class Person(ISCAItem):
         id: str | None,
         firstname: str | None,
         lastname: str,
-        default_affiliation: Affiliation,
+        default_affiliation: Affiliation | None = None,
         email: str | None = None,
         roles: set[Role] = set([Role.DEFAULT]),
         paper_affiliations: dict[str, list[Affiliation]] | None = None,
@@ -215,8 +215,6 @@ class Person(ISCAItem):
 
         # if (self.lastname is not None) and (self.lastname.isupper() or self.lastname.islower()):
         #     self.lastname = self.lastname.title()
-
-        self.logger.warning("ok go")
 
     def add_role(self, role: Role) -> None:
         """Add a given role to the current user
@@ -549,10 +547,19 @@ class Annuary(ISCAObject):
             return None
         return self._email_annuary[email]
 
-    def find_person_by_name(self, firstname: str, lastname: str, middle_initial: str | None = None) -> set[Person]:
+    def find_person_by_name(
+        self, firstname: str, lastname: str, middle_initial: str | None = None, ignore_middle_initial: bool = False
+    ) -> set[Person]:
         set_person = set()
         for person in self._annuary.values():
-            if (person.firstname != firstname) or (person.lastname != lastname):
+            person_firstname = person.firstname
+            if (ignore_middle_initial) and (person.middle_initial is not None):
+                person_firstname += f" {person.middle_initial}"
+
+            if (person_firstname != firstname) or (person.lastname != lastname):
+                continue
+
+            if ignore_middle_initial:
                 continue
 
             if (middle_initial is not None) and (person.middle_initial != middle_initial):
