@@ -1,0 +1,38 @@
+name: validate ISCA lib
+run-name: ${{ github.actor }} is in process
+
+on:
+  push:
+    paths:
+      - src/**
+
+  pull_request:
+    types:
+      - ready_for_review
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ '3.11' ]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install TeXlive
+        run: sudo apt-get update && sudo apt-get install texlive texlive-publishers texlive-science
+
+      # Setup python
+      - name: Setup python
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+
+      # Install everything
+      - name: Install the toolkit
+        run: pip install -e .[dev]
+
+      - name: Unit Tests
+        run: |
+          pytest -s tests
