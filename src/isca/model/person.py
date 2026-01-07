@@ -16,30 +16,30 @@ class Affiliation:
 
     Attributes
     ----------
-    department: str, optional
-        The name of the department (if no department, None)
-    institute: str
-        The name of the institute
-    country: str
+    short: str
+        The short name of the affiliation
+    long: str, optional
+        The long name of the affiliation
+    country: str, optional
         The country of the institute
     """
 
-    def __init__(self, institute: str, country: str | None = None, department: str | None = None):
+    def __init__(self, short: str, long: str | None = None, country: str | None = None):
         """Initialisation method
 
         Parameters
         ----------
-        institute : str
-            The name of the institute
-        country : str, optional
+        short: str
+            The short name of the affiliation
+        long: str, optional
+            The long name of the affiliation
+        country: str, optional
             The country of the institute
-        department : str, optional
-            The name of the department, if any, else None [default: None]
         """
 
-        self.department: str | None = department
+        self.short: str = short
+        self.long: str | None = long
         self.country: str | None = country
-        self.institute: str = institute
 
     def __repr__(self) -> str:
         """Get a string representation of the affiliation
@@ -49,10 +49,9 @@ class Affiliation:
         str
             The string representation of the affiliation
         """
-        list_elts = []
-        if self.department is not None:
-            list_elts.append("[" + self.department + "]")
-        list_elts.append(self.institute)
+        list_elts = [self.short]
+        if self.long is not None:
+            list_elts.append("[" + self.long + "]")
         if self.country is not None:
             list_elts.append("{" + self.country + "}")
 
@@ -67,23 +66,13 @@ class Affiliation:
             The string representation of the affiliation
         """
         list_elts = []
-        if self.department is not None:
-            list_elts.append(self.department)
-        list_elts.append(self.institute)
+        if self.short is not None:
+            list_elts.append(self.short)
+        list_elts.append(self.long)
         if self.country is not None:
             list_elts.append(self.country)
 
         return ", ".join(list_elts)
-
-    def short_str(self) -> str:
-        """Get a short string representation of the affiliation
-
-        Returns
-        -------
-        str
-            The shotr string representation of the affiliation
-        """
-        return self.institute
 
     def to_serie(self) -> pd.Series:
         """Helper to convert the class to a pandas Serie(s)
@@ -94,7 +83,7 @@ class Affiliation:
             the pandas Serie representation of the affiliation
         """
 
-        return pd.Series({"departement": self.department, "institute": self.institute, "country": self.country})
+        return pd.Series({"short": self.short, "long": self.long, "country": self.country})
 
     @classmethod
     def from_serie(cls, serie: pd.Series) -> "Affiliation":
@@ -111,11 +100,11 @@ class Affiliation:
             The resulting Affiliation object
 
         """
-        department = str(serie["department"]) if "department" in serie else None
-        institute = str(serie["institute"])
+        short = str(serie["short"])
+        long = str(serie["long"]) if "long" in serie else None
         country = str(serie["country"]) if "country" in serie else None
 
-        return Affiliation(institute, country, department)
+        return Affiliation(short, long, country)
 
 
 class Role(Enum):
@@ -309,7 +298,7 @@ class Person(ISCAItem):
         affiliations = []
         if (paper_id is None) or (paper_id not in self.paper_affiliations):
             if short:
-                aff = self.default_affiliation.institute
+                aff = self.default_affiliation.long
                 if self.default_affiliation.country is not None:
                     if markers:
                         aff += f", {{{self.default_affiliation.country}}}"
@@ -323,7 +312,7 @@ class Person(ISCAItem):
         else:
             for affiliation in self.paper_affiliations[paper_id]:
                 if short:
-                    aff = affiliation.institute
+                    aff = affiliation.long
                     if affiliation.country is not None:
                         if markers:
                             aff += f", {{{affiliation.country}}}"
@@ -346,7 +335,7 @@ class Person(ISCAItem):
         if not self.paper_affiliations:
             # Add the default affiliation
             if short:
-                affiliation = self.default_affiliation.institute
+                affiliation = self.default_affiliation.long
             elif markers:
                 affiliation = repr(self.default_affiliation)
             else:
@@ -358,7 +347,7 @@ class Person(ISCAItem):
             for affiliation_list in self.paper_affiliations.values():
                 for affiliation in affiliation_list:
                     if short:
-                        affiliation = affiliation.institute
+                        affiliation = affiliation.long
                     elif markers:
                         affiliation = repr(affiliation)
                     else:
