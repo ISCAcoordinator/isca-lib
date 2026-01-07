@@ -64,7 +64,8 @@ class Event(ISCAItem, ABC):
             the theme of the event (None, if not defined)
         """
 
-        super(ISCAItem, self).__init__(id)
+        # super(ISCAItem, self).__init__(id)
+        super().__init__(id)
         super(ABC).__init__()
 
         self.name: str = name
@@ -513,7 +514,7 @@ class Conference(Event):
 
         """
         if not self._authors2papers.keys():
-            self._resolve_author_paper_association()
+            self.resolve_author_paper_association()
 
         return self._authors2papers
 
