@@ -36,6 +36,8 @@ class Affiliation:
         country: str, optional
             The country of the institute
         """
+        # NOTE: this assert is added to prevent a likely issue during the metadata parsing
+        assert short is not None, "Try to create an affiliation with no information to be used"
 
         self.short: str = short
         self.long: str | None = long
