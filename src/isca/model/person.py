@@ -298,7 +298,7 @@ class Person(ISCAItem):
         affiliations = []
         if (paper_id is None) or (paper_id not in self.paper_affiliations):
             if short:
-                aff = self.default_affiliation.long
+                aff = self.default_affiliation.short
                 if self.default_affiliation.country is not None:
                     if markers:
                         aff += f", {{{self.default_affiliation.country}}}"
@@ -312,7 +312,7 @@ class Person(ISCAItem):
         else:
             for affiliation in self.paper_affiliations[paper_id]:
                 if short:
-                    aff = affiliation.long
+                    aff = affiliation.short
                     if affiliation.country is not None:
                         if markers:
                             aff += f", {{{affiliation.country}}}"
@@ -335,7 +335,7 @@ class Person(ISCAItem):
         if not self.paper_affiliations:
             # Add the default affiliation
             if short:
-                affiliation = self.default_affiliation.long
+                affiliation = self.default_affiliation.short
             elif markers:
                 affiliation = repr(self.default_affiliation)
             else:
@@ -347,7 +347,7 @@ class Person(ISCAItem):
             for affiliation_list in self.paper_affiliations.values():
                 for affiliation in affiliation_list:
                     if short:
-                        affiliation = affiliation.long
+                        affiliation = affiliation.short
                     elif markers:
                         affiliation = repr(affiliation)
                     else:
