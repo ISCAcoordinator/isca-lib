@@ -152,7 +152,7 @@ class PDFLoader(ISCAObject):
 
                 matching_authors = set()
                 if self._annuary is not None:
-                    matching_authors = self._annuary.find_person_by_name(first_name, last_name, ignore_middle_initial=True)
+                    matching_authors = self._annuary.find_persons_by_name(first_name, last_name, ignore_middle_initial=True)
 
                 if len(matching_authors) == 1:
                     cur_author = matching_authors.pop()

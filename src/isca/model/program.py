@@ -473,8 +473,6 @@ class PresentationSession(ScientificSession):
     ----------
     chairs: list[Person], optional
         The list of the chairs of the session
-    _presentations: list[Presentation]
-        The list of presentations taking place in the session
     """
 
     def __init__(
@@ -486,6 +484,24 @@ class PresentationSession(ScientificSession):
         presentations: list[Presentation] | None = None,
         chairs: list[Person] | None = None,
     ):
+        """Initialisation method
+
+        Parameters
+        ----------
+        id : str
+            The identifier of the session
+        name : str
+            the name of the session
+        start : datetime.datetime
+            the starting time of the session
+        end : datetime.datetime
+            the ending time of the session
+        presentations : list[Presentation], optional
+            the initial list of presentations taking part of the
+            session
+        chairs : list[Person], optional
+            the initial list of chairs of the session
+        """
         super().__init__(id, name)
         self._presentations: list[Presentation] = presentations if presentations is not None else []
         self.chairs: list[Person] = chairs if chairs is not None else []
@@ -552,12 +568,6 @@ class PresentationSession(ScientificSession):
         -------
         bool:
             True if the presentation is part of the session, else False
-
-        Examples
-        --------
-        FIXME: Add docs.
-
-
         """
         return presentation in self._presentations
 
@@ -575,15 +585,55 @@ class PresentationSession(ScientificSession):
             self._logger.warning(f"The presentation {presentation} is not part of the session {self}")
 
     def replace_presentation(self, presentation_out: Presentation, presentation_in: Presentation):
+        """Replace a given presentation by a new one
+
+        Parameters
+        ----------
+        presentation_out : Presentation
+            The presentation to be replaced
+        presentation_in : Presentation
+            The replacing presentation
+
+        Raises
+        ------
+        ValueError
+            The presentation to be replaced is not part of the session
+        """
+
         idx = self._presentations.index(presentation_out)
         if idx < 0:
             raise ValueError(f'"{presentation_out.id}" is not part of the session, so it can\'t be replaced')
         self._presentations[idx] = presentation_in
 
     def start_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+        """Returns the start of the session used as the start of the presentation
+
+        Parameters
+        ----------
+        presentation : Presentation | int
+            Not used
+
+        Returns
+        -------
+        datetime.datetime
+            the start of the session used as the start of the presentation
+        """
         return self.start
 
     def end_presentation(self, presentation: Presentation | int) -> datetime.datetime:
+        """Returns the end of the session used as the end of the presentation
+
+        Parameters
+        ----------
+        presentation : Presentation | int
+            Not used
+
+        Returns
+        -------
+        datetime.datetime
+            the end of the session used as the end of the presentation
+        """
+
         return self.end
 
     def sort_criterion(self) -> str:
@@ -830,6 +880,18 @@ class KeynoteSession(OralSession):
         self._default_presentation_duration: int = default_presentation_duration
 
     def add_presentation(self, presentation: Presentation):
+        """Add a presentation (instance of Keynote!) to the keynote session
+
+        Parameters
+        ----------
+        presentation : Presentation
+            The presentation to add
+
+        Raises
+        ------
+        Exception
+            If the presentation is not a Keynote
+        """
         if not isinstance(presentation, Keynote):
             raise Exception(f"[{self.id}] The presentation ({presentation.id}) should be a Keynote")
 
@@ -876,6 +938,19 @@ class PosterSession(PresentationSession):
                 self.add_presentation(p)
 
     def add_presentation(self, presentation: Presentation):
+        """Add a presentation (instance of PosterPresentation!) to the poster session
+
+        Parameters
+        ----------
+        presentation : Presentation
+            The presentation to add
+
+        Raises
+        ------
+        Exception
+            If the presentation is not a PosterPresentation
+        """
+
         if not isinstance(presentation, PosterPresentation):
             raise Exception(f"[{self.id}] The presentation ({presentation.id}) should be a Poster")
 

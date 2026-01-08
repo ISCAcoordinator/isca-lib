@@ -435,9 +435,12 @@ class Conference(Event):
         Parameters
         ----------
         select_criterion : Callable[[Person], bool], optional
-            the criterion to select the person to keep in the annuary,
-            xx
+            the criterion to select the person to keep in the annuary
 
+        Example
+        -------
+        self.compress_annuary(lambda x: bool(x.validate_roles(set([Role.AUTHOR, Role.PRESENTER]))))
+            to just select the authors and the presenters (and ignore, the chairs, the reviewers, ...)
         """
 
         if select_criterion is not None:
@@ -523,4 +526,7 @@ class Conference(Event):
     ###########################################################################################################
     def __repr__(self) -> str:
         """return repr(self)"""
-        return f"Conference({self.name}, start={self.start_date}, end={self.end_date}, chairs={self.chairs}, nb_papers={len(self.papers.keys())}, nb_sessions={len(self.sessions)})"
+        return (
+            f"Conference({self.name}, start={self.start_date}, end={self.end_date}, "
+            + "chairs={self.chairs}, nb_papers={len(self.papers.keys())}, nb_sessions={len(self.sessions)})"
+        )
