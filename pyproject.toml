@@ -21,8 +21,8 @@ dependencies = [
   "pandas>=2.3.0",
   "ruamel.yaml>=0.18.13",
   "unidecode>=1.4.0",
-  "typing_extensions",
-  "pymupdf"
+  "typing_extensions>=4.15.0",
+  "pymupdf>=1.26.6"
 ]
 [project.optional-dependencies]
 dev = [
