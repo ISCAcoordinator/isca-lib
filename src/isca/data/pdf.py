@@ -31,6 +31,7 @@ class PDF(ISCAItem):
         pdf_file: pathlib.Path,
         pdf_content: pymupdf.Document,
         pdf_metadata: dict[str, str] | None,
+        pdf_info: dict[str, str] | None,
         title: str | None,
         authors: list[Person] | None,
     ):
@@ -45,6 +46,8 @@ class PDF(ISCAItem):
             pymupdf
         pdf_metadata : dict[str, str], optional
             The metadata contained in the PDF file
+        pdf_info : dict[str, str], optional
+            Additional information contained in the PDF file (page size, font size, ...)
         title : str, optional
             the title of the PDF (None, if not defined)
         authors : list[Person], optional
@@ -57,6 +60,7 @@ class PDF(ISCAItem):
         self._pdf_file: pathlib.Path = pdf_file
         self._content = pdf_content
         self._metadata = pdf_metadata
+        self._info = pdf_info
         self._title = title
         self._authors = authors
 
@@ -67,6 +71,10 @@ class PDF(ISCAItem):
     @property
     def metadata(self) -> dict[str, str] | None:
         return self._metadata
+
+    @property
+    def info(self) -> dict[str, str] | None:
+        return self._info
 
     @property
     def title(self) -> str | None:

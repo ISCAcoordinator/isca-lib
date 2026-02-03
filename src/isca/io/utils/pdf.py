@@ -11,6 +11,8 @@ from isca.model.core import ISCAObject
 from isca.model.person import Annuary, Person
 from isca.data.pdf import PDF
 
+from collections import Counter
+
 
 LATEX_FONTS = set(
     [
@@ -79,9 +81,9 @@ class PDFLoader(ISCAObject):
         """
 
         # Parse metadata
-        pdf_content: pymupdf.Document = pymupdf.open(pdf_file)
-        metadata = self._load_extended_metadata(pdf_content)
-
+        pdf_document: pymupdf.Document = pymupdf.open(pdf_file)
+        metadata = self._load_extended_metadata(pdf_document)
+        pdf_info = self._extract_additional_info(pdf_document)
         # Check if it is a word document
         title = None
         if PDF_TITLE_KEY in metadata:
@@ -91,9 +93,9 @@ class PDFLoader(ISCAObject):
         if camera_ready:
             authors = self._get_authors(metadata)
 
-        return PDF(pdf_file, pdf_content, metadata, title, authors)
+        return PDF(pdf_file, pdf_document, metadata, pdf_info, title, authors)
 
-    def _load_extended_metadata(self, pdf_content: pymupdf.Document) -> dict[str, str]:
+    def _load_extended_metadata(self, pdf_document: pymupdf.Document) -> dict[str, str]:
         """Load the metadata from the PDF file (including the extended keys)
 
         Parameters
@@ -109,13 +111,13 @@ class PDFLoader(ISCAObject):
         """
 
         metadata = {}  # make my own metadata dict
-        what, value = pdf_content.xref_get_key(-1, "Info")  # /Info key in the trailer
+        what, value = pdf_document.xref_get_key(-1, "Info")  # /Info key in the trailer
         if what != "xref":
             pass  # PDF has no metadata
         else:
             xref = int(value.replace("0 R", ""))  # extract the metadata xref
-            for key in pdf_content.xref_get_keys(xref):
-                metadata[key.lower()] = pdf_content.xref_get_key(xref, key)[1]
+            for key in pdf_document.xref_get_keys(xref):
+                metadata[key.lower()] = pdf_document.xref_get_key(xref, key)[1]
 
         return metadata
 
@@ -173,3 +175,29 @@ class PDFLoader(ISCAObject):
                 raise PDFMetadataException(f'Can\'t parse authors: "{cur_author}"')
 
         return list_authors
+
+    def _extract_additional_info(self, pdf_document: pymupdf.Document) -> dict[str, str]:
+        pdf_info = dict()
+
+        # Get the first page size
+        page1 = pdf_document[0].get_text("dict")
+        pdf_info["page_size"] = (int(page1["width"]), int(page1["height"]))
+
+        # Get the first page font size (majority)
+        blocks = pdf_document[0].get_text("dict", flags=11)["blocks"]
+        fsizes = []
+        for b in blocks:  # iterate through the text blocks
+            for l in b["lines"]:  # iterate through the text lines
+                for s in l["spans"]:  # iterate through the text spans
+                    fsizes += [round(s["size"])]
+
+        if len(fsizes) == 0:
+            pdf_info["font_size"] = 0
+        else:
+            most_common = Counter(fsizes).most_common()
+            # don't count line numbers
+            if most_common[0][0] == 5:
+                pdf_info["font_size"] = most_common[1][0]
+            pdf_info["font_size"] = most_common[0][0]
+
+        return pdf_info
