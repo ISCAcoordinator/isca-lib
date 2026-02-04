@@ -198,6 +198,7 @@ class PDFLoader(ISCAObject):
             # don't count line numbers
             if most_common[0][0] == 5:
                 pdf_info["font_size"] = most_common[1][0]
-            pdf_info["font_size"] = most_common[0][0]
+            else:
+                pdf_info["font_size"] = most_common[0][0]
 
         return pdf_info

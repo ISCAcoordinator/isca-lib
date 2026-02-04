@@ -5,7 +5,7 @@ from isca.data.pdf import PDF
 from isca.model.item import Paper
 import unicodedata
 
-INVALID_SECTION_REGEXP = re.compile(r"^([0-9]+[.][ \t]*([Rr]eference|[Aa]cknowledgement)s?[ \t]*|\[[0-9]+\] .*)$")
+VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(r"^([0-9]+[.][ \t]*([Rr]eference|[Aa]cknowledgment)s?[ \t]*|\[[0-9]+\] .*)$")
 LATEX_FONTS = set(
     [
         # "CMR9",
@@ -20,7 +20,7 @@ ANONYMOUS_METADATA_ALLOWED_AUTHOR_INFO = {
     "",
     "author name(s) withheld",
     "steidl",
-    "anonymous submission to interspeech 2025",
+    "anonymous submission to interspeech",
     "administrator",
     "xx  {};",
     "anonymous",
@@ -74,12 +74,15 @@ class MinimalPDFChecker(ISCAObject):
 
     def _validate_non_content(self, doc: pymupdf.Document) -> None | str:
         start_reference_page = self._max_nb_pages - self._nb_non_content_pages
+        if start_reference_page >= doc.page_count:
+            return None
+
         lines = doc.load_page(start_reference_page).get_text().split("\n")
         for first_line in lines:
             first_line = first_line.strip()
             if first_line:
                 break
-        m = INVALID_SECTION_REGEXP.match(first_line.lower())
+        m = VALID_REFERENCE_PAGE_CONTENT_REGEXP.match(first_line.lower())
         if m:
             return None
         else:
