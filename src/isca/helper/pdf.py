@@ -48,13 +48,38 @@ ACCEPTED_PAGE_SIZE = (595, 841)
 class MinimalPDFChecker(ISCAObject):
     """Minimal PDF Checker which assumes that the PDF is compiled using the ISCA template"""
 
-    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2):
+    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True):
+        """Initialisation
+
+        Parameters
+        ----------
+        max_nb_pages : int
+            The maximum number of pages authorized for the publication
+        nb_non_content_pages : int
+            The maximum number of content pages authorized for the publication
+        check_font : bool
+            Should we check the fonts or simply ignore them
+        """
+
         super().__init__()
         self._max_nb_pages = max_nb_pages
         self._nb_non_content_pages = nb_non_content_pages
-        self._check_font = True
+        self._check_font = check_font
 
-    def _validate_font(self, first_page) -> None | str:
+    def _validate_fonts(self, first_page: pymupdf.Page) -> None | str:
+        """Validate if the fonts of the first page are the ones required by the template
+
+        Parameters
+        ----------
+        first_page : pymupdf.Page
+            The first page of the PDF document
+
+        Returns
+        -------
+        None | str
+            None if the fonts are valid, else the failing report
+        """
+
         report = None
         doc_fonts = set([f[3].split("+")[-1] for f in first_page.get_fonts()])  # NOTE: 4th field is hash+font name
         if not (LATEX_FONTS <= doc_fonts):
@@ -63,6 +88,18 @@ class MinimalPDFChecker(ISCAObject):
         return report
 
     def _validate_title(self, title: str) -> None | str:
+        """Validate if the title follows the guidelines
+
+        Parameters
+        ----------
+        title : str
+            The title of the article
+
+        Returns
+        -------
+        None | str
+            None if the title follows the guideline, else the failing report
+        """
         report = None
 
         if title.isupper():
@@ -73,6 +110,20 @@ class MinimalPDFChecker(ISCAObject):
         return report
 
     def _validate_non_content(self, doc: pymupdf.Document) -> None | str:
+        """Validate if the non content page do not have content
+
+        Parameters
+        ----------
+        doc : pymupdf.Document
+            The PDF document of the submission
+
+        Returns
+        -------
+        None | str
+            None if the last pages are valid, else the failing report
+
+        """
+
         start_reference_page = self._max_nb_pages - self._nb_non_content_pages
         if start_reference_page >= doc.page_count:
             return None
@@ -88,7 +139,25 @@ class MinimalPDFChecker(ISCAObject):
         else:
             return f"It seems that there is content on the non-content pages: '{first_line}'"
 
-    def validates(self, pid: str, pdf: PDF, paper: Paper | None = None) -> tuple[bool, dict[str, bool], dict[str, str]]:
+    def validates(
+        self, pid: str, pdf: PDF, paper: Paper | None = None
+    ) -> tuple[bool, dict[str, bool], dict[str, str]]:  # pyright: ignore[reportUndefinedVariable]
+        """Validate the PDF of a given submission
+
+        Parameters
+        ----------
+        pid : str
+            The paper identifier
+        pdf : PDF
+            the PDF document of the submission
+        paper : Paper, optional
+            The Paper object containing the metadata of the submission. None if no metadata is available
+
+        Returns
+        -------
+        tuple[bool, dict[str, bool], dict[str, str]]
+            a tuple indicating: the overall status (fail=False, pass=True), the detailed status and the detailed report)
+        """
         status: dict[str, bool] = dict()
         report: dict[str, str] = dict()
 
@@ -139,7 +208,7 @@ class MinimalPDFChecker(ISCAObject):
 
         # Validate fonts of the first page01
         if self._check_font and is_latex:
-            report_font = self._validate_font(first_page)
+            report_font = self._validate_fonts(first_page)
             if report_font is not None:
                 status["font"] = True
                 report["font"] = report_font
@@ -176,10 +245,36 @@ class MinimalPDFChecker(ISCAObject):
 
 
 class AnonymousPDFChecker(MinimalPDFChecker):
-    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2):
-        super().__init__(max_nb_pages, nb_non_content_pages)
+    """PDF Checker to validate if that an anonymous submission validates the requirements of the PDF format AND the anonymity requirements"""
 
-    def anonymous_metadata(self, pdf: PDF) -> None | str:
+    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_fonts: bool = True):
+        """Initialisation
+
+        Parameters
+        ----------
+        max_nb_pages : int
+            The maximum number of pages authorized for the publication
+        nb_non_content_pages : int
+            The maximum number of content pages authorized for the publication
+        check_font : bool
+            Should we check the fonts or simply ignore them
+        """
+        super().__init__(max_nb_pages, nb_non_content_pages, check_fonts)
+
+    def _anonymous_metadata(self, pdf: PDF) -> None | str:
+        """Validate if the PDF metadata does not leak information
+
+        Parameters
+        ----------
+        pdf : PDF
+            The PDF object to validate
+
+        Returns
+        -------
+        None | str
+            None if no information is leaked, a string report if some information has been found
+        """
+
         report = None
         if (pdf.metadata is None) or ("author" not in pdf.metadata):
             return report
@@ -190,7 +285,19 @@ class AnonymousPDFChecker(MinimalPDFChecker):
                 report = f"Author visible in the metadata: {auth}"
         return report
 
-    def anonymous_pdf(self, title: str, pdf: PDF) -> None | str:
+    def _anonymous_pdf(self, title: str, pdf: PDF) -> None | str:
+        """Validate if the visible part of the PDF does not leak information
+
+        Parameters
+        ----------
+        pdf : PDF
+            The PDF object to validate
+
+        Returns
+        -------
+        None | str
+            None if no information is leaked, a string report if some information has been found
+        """
         # Prepare the content of the PDF to be analyzed
         txt = pdf.content[0].get_text().lower().replace("\n", " ")
         txt = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode("ascii")
@@ -225,16 +332,32 @@ class AnonymousPDFChecker(MinimalPDFChecker):
     def validates(
         self, pid: str, pdf: PDF, paper: Paper | None = None
     ) -> tuple[bool, dict[str, bool], dict[str, str]]:  # pyright: ignore[reportUndefinedVariable]
+        """Validate the PDF of a given submission
+
+        Parameters
+        ----------
+        pid : str
+            The paper identifier
+        pdf : PDF
+            the PDF document of the submission
+        paper : Paper, optional
+            The Paper object containing the metadata of the submission. None if no metadata is available
+
+        Returns
+        -------
+        tuple[bool, dict[str, bool], dict[str, str]]
+            a tuple indicating: the overall status (fail=False, pass=True), the detailed status and the detailed report)
+        """
         assert paper is not None, f"[pid={pid}] For anonymous submission, the paper metadata (not the PDF metdata) is required"
         _, summary, report = super().validates(pid, pdf, paper)
 
         # TODO: add specific checks
-        report_anonymous_metadata = self.anonymous_metadata(pdf)
+        report_anonymous_metadata = self._anonymous_metadata(pdf)
         if report_anonymous_metadata is not None:
             summary["anonymous_metadata"] = True
             report["anonymous_metadata"] = report_anonymous_metadata
 
-        report_anonymous_pdf = self.anonymous_pdf(paper.title, pdf)
+        report_anonymous_pdf = self._anonymous_pdf(paper.title, pdf)
         if report_anonymous_pdf is not None:
             summary["anonymous_pdf"] = True
             report["anonymous_pdf"] = report_anonymous_pdf
@@ -249,6 +372,7 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
     def validates(
         self, pid: str, pdf: PDF, paper: Paper | None = None
     ) -> tuple[bool, dict[str, bool], dict[str, str]]:  # pyright: ignore[reportUndefinedVariable]
+        raise NotImplementedError("The camera ready validation is not yet implemented")
         assert paper is not None, f"[pid={pid}] For anonymous submission, the paper metadata (not the PDF metdata) is required"
         _, summary, report = super().validates(pid, pdf, paper)
 
