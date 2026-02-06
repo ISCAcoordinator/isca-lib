@@ -5,7 +5,9 @@ from isca.data.pdf import PDF
 from isca.model.item import Paper
 import unicodedata
 
-VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(r"^([0-9]+[.][ \t]*([Rr]eference|[Aa]cknowledgment)s?[ \t]*|\[[0-9]+\] .*)$")
+VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(
+    r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\] .*)$", flags=re.IGNORECASE
+)
 LATEX_FONTS = set(
     [
         # "CMR9",
@@ -188,7 +190,7 @@ class MinimalPDFChecker(ISCAObject):
                 abs(int(pdf.info["page_size"][1]) - ACCEPTED_PAGE_SIZE[1]) > 1
             ):
                 status["page_size"] = True
-                report["page_size"] = f"The computed font size is {pdf.info['page_size']} instead of {ACCEPTED_PAGE_SIZE}"
+                report["page_size"] = f"The computed page size is {pdf.info['page_size']} instead of {ACCEPTED_PAGE_SIZE}"
 
         # Check if document is latex of word
         is_latex = False
