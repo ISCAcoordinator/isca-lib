@@ -68,6 +68,25 @@ class MinimalPDFChecker(ISCAObject):
         self._nb_non_content_pages = nb_non_content_pages
         self._check_font = check_font
 
+    def _detect_suspicious_nb_pages(self, doc: pymupdf.Document) -> None | str:
+        """Check if the number of pages is suspiciously low (< nb content pages / 2)
+
+        Parameters
+        ----------
+        doc : pymupdf.Document
+            The PDF document
+
+        Returns
+        -------
+        None | str
+            None if the number of pages is valid, else the failing report
+
+        """
+
+        if doc.page_count < ((self._max_nb_pages - self._nb_non_content_pages) // 2):
+            return f"Suspicious number of pages: {doc.page_count}"
+        return None
+
     def _validate_fonts(self, first_page: pymupdf.Page) -> None | str:
         """Validate if the fonts of the first page are the ones required by the template
 
@@ -170,6 +189,11 @@ class MinimalPDFChecker(ISCAObject):
             report[
                 "nb_pages"
             ] = f"The number of pages {nb_pages} is above the maximum autorised number of pages {self._max_nb_pages}"
+        else:
+            suspicious_report = self._detect_suspicious_nb_pages(pdf.content)
+            if suspicious_report is not None:
+                status["nb_pages"] = True
+                report["nb_pages"] = suspicious_report
 
         if pdf.metadata is None:
             status["no_metadata"] = True
