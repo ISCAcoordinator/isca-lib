@@ -6,7 +6,7 @@ from isca.model.item import Paper
 import unicodedata
 
 VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(
-    r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\] .*)$", flags=re.IGNORECASE
+    r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\].*)$", flags=re.IGNORECASE
 )
 LATEX_FONTS = set(
     [
