@@ -43,6 +43,7 @@ ANONYMOUS_PDF_ALLOWED_AUTHOR_INFO = {
     "(!)",
     "g anonymous",
 }
+ANONYMOUS_PDF_JOKERS = {"anonymous submission to interspeech"}
 ACCEPTED_FONT_SIZE = 9
 ACCEPTED_PAGE_SIZE = (595, 841)
 
@@ -273,7 +274,7 @@ class MinimalPDFChecker(ISCAObject):
 class AnonymousPDFChecker(MinimalPDFChecker):
     """PDF Checker to validate if that an anonymous submission validates the requirements of the PDF format AND the anonymity requirements"""
 
-    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_fonts: bool = True):
+    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_fonts: bool = True, strict: bool = True):
         """Initialisation
 
         Parameters
@@ -284,8 +285,11 @@ class AnonymousPDFChecker(MinimalPDFChecker):
             The maximum number of content pages authorized for the publication
         check_font : bool
             Should we check the fonts or simply ignore them
+        strict : bool
+            If True, do not let anything pass, else be more tolerant (see the method validates to know the conditions)
         """
         super().__init__(max_nb_pages, nb_non_content_pages, check_fonts)
+        self._strict = strict
 
     def _anonymous_metadata(self, pdf: PDF) -> None | str:
         """Validate if the PDF metadata does not leak information
@@ -311,23 +315,39 @@ class AnonymousPDFChecker(MinimalPDFChecker):
                 report = f"Author visible in the metadata: {auth}"
         return report
 
-    def _anonymous_pdf(self, title: str, pdf: PDF) -> None | str:
+    def _anonymous_pdf(self, title: str, pdf: PDF, strict: bool = True) -> None | str:
         """Validate if the visible part of the PDF does not leak information
 
         Parameters
         ----------
+        title: str
+            The title used as a reference to detect the author area
         pdf : PDF
             The PDF object to validate
+        strict: bool
+            The validation is strict if True, if False - if some tokens (see ANONYMOUS_PDF_JOKERS) are detected, the PDF is defacto considered valid!
 
         Returns
         -------
         None | str
             None if no information is leaked, a string report if some information has been found
         """
+        report = None
+
         # Prepare the content of the PDF to be analyzed
         txt = pdf.content[0].get_text().lower().replace("\n", " ")
         txt = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode("ascii")
         txt = txt.replace("  ", " ")
+
+        # Joker strings which qualified the paper to defacto be anonymous (!Dangerous!!!!)
+        if not strict:
+            valid = False
+            for joker in ANONYMOUS_PDF_JOKERS:
+                if re.match(f".*{joker.lower()}.*", txt):
+                    valid = True
+                    break
+            if valid:
+                return None
 
         # Prepare the title to be searched (but be relaxed with the non-letter)
         title = title.lower().strip()
@@ -341,7 +361,6 @@ class AnonymousPDFChecker(MinimalPDFChecker):
 
         title_regexp = "".join([_generate_regex_elt(s) for s in title])
 
-        report = None
         authstr = re.sub(title_regexp, "", txt).strip()
 
         valid = False
@@ -383,7 +402,7 @@ class AnonymousPDFChecker(MinimalPDFChecker):
             summary["anonymous_metadata"] = True
             report["anonymous_metadata"] = report_anonymous_metadata
 
-        report_anonymous_pdf = self._anonymous_pdf(paper.title, pdf)
+        report_anonymous_pdf = self._anonymous_pdf(paper.title, pdf, self._strict)
         if report_anonymous_pdf is not None:
             summary["anonymous_pdf"] = True
             report["anonymous_pdf"] = report_anonymous_pdf
