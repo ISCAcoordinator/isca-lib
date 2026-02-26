@@ -167,7 +167,7 @@ class Person(ISCAItem):
         id: str,
         firstname: str | None,
         lastname: str,
-        default_affiliation: Affiliation,
+        default_affiliation: Affiliation | None = None,
         email: str | None = None,
         roles: set[Role] = set([Role.DEFAULT]),
         paper_affiliations: dict[str, list[Affiliation]] | None = None,
@@ -185,7 +185,7 @@ class Person(ISCAItem):
             The first name of the person (set to None if mono-name)
         lastname : str
             The last name of the person
-        default_affiliation : Affiliation
+        default_affiliation : Affiliation, optional
             The default affiliation of the person
         email : str, optional
             The current email of the person
@@ -199,7 +199,7 @@ class Person(ISCAItem):
         super().__init__(id)
         self.firstname: str | None = firstname.strip() if firstname is not None else None
         self.lastname: str = lastname.strip()
-        self.default_affiliation: Affiliation = default_affiliation
+        self.default_affiliation: Affiliation | None = default_affiliation
         self.middle_initial: str | None = middle_initial if (middle_initial is not None) and middle_initial.strip() else None
         self._roles: set[Role] = roles
         self.email: str | None = email.lower().strip() if email is not None else None
@@ -324,18 +324,19 @@ class Person(ISCAItem):
 
         affiliations = []
         if (paper_id is None) or (paper_id not in self.paper_affiliations):
-            if short:
-                aff = self.default_affiliation.short
-                if self.default_affiliation.country is not None:
-                    if markers:
-                        aff += f", {{{self.default_affiliation.country}}}"
-                    else:
-                        aff += f", {self.default_affiliation.country}"
-                affiliations.append(aff)
-            elif markers:
-                affiliations.append(repr(self.default_affiliation))
-            else:
-                affiliations.append(str(self.default_affiliation))
+            if self.default_affiliation is not None:
+                if short:
+                    aff = self.default_affiliation.short
+                    if self.default_affiliation.country is not None:
+                        if markers:
+                            aff += f", {{{self.default_affiliation.country}}}"
+                        else:
+                            aff += f", {self.default_affiliation.country}"
+                    affiliations.append(aff)
+                elif markers:
+                    affiliations.append(repr(self.default_affiliation))
+                else:
+                    affiliations.append(str(self.default_affiliation))
         else:
             for affiliation in self.paper_affiliations[paper_id]:
                 if short:
