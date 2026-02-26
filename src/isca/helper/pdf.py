@@ -1,9 +1,13 @@
+from typing import Any
 import re
 import pymupdf
+import unicodedata
+
 from isca.model.core import ISCAObject
 from isca.data.pdf import PDF
 from isca.model.item import Paper
-import unicodedata
+from .string_helpers import diff_html
+
 
 VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(
     r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\].*)$", flags=re.IGNORECASE
@@ -411,16 +415,47 @@ class AnonymousPDFChecker(MinimalPDFChecker):
 
 
 class CameraReadyPDFChecker(MinimalPDFChecker):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True):
+        super().__init__(max_nb_pages, nb_non_content_pages, check_font)
+
+    def _validate_abstract(self, first_page: pymupdf.Page, abstract: str) -> str | None:
+        first_page_content = str(first_page.get_text())
+        report = None
+        # didn't find the exact abstract, try more permissive search
+        ab_st = first_page_content.lower().find("abstract")
+        if ab_st > -1:
+            # Search indexed terms or keywords first
+            res = re.search("(index terms[ ]*|keywords[ ]*:)", first_page_content.lower())
+            ab_fin = res.start() if res is not None else -1
+            # If not working try to find the introduction
+            if ab_fin == -1:
+                res = re.search(r"(1.? )?introduction", first_page_content.lower())
+                ab_fin = res.start() if res is not None else -1
+
+            # found abstract so generate diff
+            if ab_st > -1 and ab_fin > -1:
+                abstract_cand = first_page_content[ab_st + 8 : ab_fin].strip()
+                # dlist = find_diffs(abstract, abstract_cand, METADATA_DIFF_HEADER, PDF_DIFF_HEADER)
+                diff_latex = diff_html(abstract, abstract_cand)
+                if diff_latex != "":
+                    report = diff_latex
+            else:
+                report = "manual check required"
+        else:
+            report = "manual check required"
+
+        return report
 
     def validates(
         self, pid: str, pdf: PDF, paper: Paper | None = None
     ) -> tuple[bool, dict[str, bool], dict[str, str]]:  # pyright: ignore[reportUndefinedVariable]
-        raise NotImplementedError("The camera ready validation is not yet implemented")
         assert paper is not None, f"[pid={pid}] For anonymous submission, the paper metadata (not the PDF metdata) is required"
         _, summary, report = super().validates(pid, pdf, paper)
 
-        # TODO: add specific checks
+        first_page = pdf.content.load_page(0)
+        abstract_report = self._validate_abstract(first_page, paper.abstract if paper.abstract is not None else "")
+        if abstract_report is not None:
+            summary["abstract"] = True
+            report["abstract"] = abstract_report
 
         return (len(summary.keys()) > 0, summary, report)
