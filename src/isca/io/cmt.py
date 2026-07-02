@@ -126,7 +126,7 @@ class CMTSerialiser(Serialiser):
                         failed_papers += 1
 
                 # Link PDF
-                if pdf_path is not None:
+                if (pdf_path is not None) and pdf_path.exists():
                     cur_paper.pdf_file = pdf_path.resolve()
 
                 # Add track
