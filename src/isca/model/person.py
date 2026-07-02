@@ -410,7 +410,7 @@ class Person(ISCAItem):
 
         return (
             f"{self.__class__.__name__}(id={self.id}, first_name={self.firstname}, middle_initial={self.middle_initial}, "
-            + "last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
+            + f"last_name={self.lastname}, email={self.email}, affiliation=[{self.default_affiliation}]), roles=({self._roles})"
         )
 
     def __str__(self) -> str:
