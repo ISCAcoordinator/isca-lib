@@ -575,7 +575,7 @@ def diff_latex(s1: str, s2: str) -> str:
     return "".join(result)
 
 
-def diff_html(s1: str, s2: str, deletion_color: str = "#ff0000", insertion_color: str = "#00ff00") -> str:
+def diff_html(s1: str, s2: str, deletion_color: str = "#ffdddd", insertion_color: str = "#ddffdd") -> str:
     """Generate a HTML diff report between two strings
 
     When using you report, you need to define two CSS variables:
