@@ -43,6 +43,7 @@ class CMTSerialiser(Serialiser):
         submission_summary_file: pathlib.Path,
         paper_root_dir: pathlib.Path | None = None,
         updated_paper_root_dir: pathlib.Path | None = None,
+        pdf_name_format: str = "{paper_id}.pdf",
     ) -> tuple[dict[str, Paper], Annuary]:
 
         dict_papers = dict()
@@ -71,22 +72,23 @@ class CMTSerialiser(Serialiser):
                 # If expected to have PDF, use the PDF to replace the information
                 pdf_path = None
                 if paper_root_dir is not None:
+                    # FIXME: this is pretty lame as it assumes that the paper id is an int!
+                    pdf_file_name = pdf_name_format.format_map({"paper_id": int(paper_id)})
                     paper_id = str(paper_id)
-                    pdf_path = paper_root_dir / f"{paper_id}.pdf"
+                    pdf_path = paper_root_dir / pdf_file_name
 
-                    if (updated_paper_root_dir is not None) and (updated_paper_root_dir / f"{paper_id}.pdf").exists():
+                    if (updated_paper_root_dir is not None) and (updated_paper_root_dir / pdf_file_name).exists():
                         self.logger.debug(
                             f"[{paper_id}] using the updated PDF",
                             extra={
                                 "paper_id": paper_id,
                             },
                         )
-                        pdf_path = updated_paper_root_dir / f"{paper_id}.pdf"
+                        pdf_path = updated_paper_root_dir / pdf_file_name
 
                 if self._metadata_from_pdf:
                     try:
                         if (pdf_path is not None) and pdf_path.exists():
-
                             pdf = self._pdf_loader.load_pdf(pdf_path, True)
                             cur_paper.title = pdf.title
                             # cur_paper.replace_authors(pdf.authors)  # TODO: for now it is not linked to any email

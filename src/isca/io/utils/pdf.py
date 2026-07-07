@@ -29,7 +29,7 @@ LATEX_FONTS = set(
 PDF_WORD_KEYWORD_SUFFIX = "_WORD_TEMPLATE"
 PDF_AUTHOR_KEY = "author"
 PDF_TITLE_KEY = "title"
-PDF_AUTHOR_RE = r"([^{]*) \{([^}]+)\}(?: \{([0-9, ]+)\})?"
+PDF_AUTHOR_RE = r"(?:[^{]*) \{([^}]*)\}(?: \{([0-9, ]+)\})?"
 
 METADATA_DIFF_HEADER = "[metadata]"
 PDF_DIFF_HEADER = "[pdf]     "
@@ -84,10 +84,14 @@ class PDFLoader(ISCAObject):
         pdf_document: pymupdf.Document = pymupdf.open(pdf_file)
         metadata = self._load_extended_metadata(pdf_document)
         pdf_info = self._extract_additional_info(pdf_document)
+
         # Check if it is a word document
-        title = None
+        title = ""
         if PDF_TITLE_KEY in metadata:
             title = metadata[PDF_TITLE_KEY].replace("\n", " ")
+
+        if not title:
+            raise KeyError("The PDF is not valid as there is no title")
 
         authors = None
         if camera_ready:
@@ -151,6 +155,13 @@ class PDFLoader(ISCAObject):
             if m:
                 first_name = m.group(1)
                 last_name = m.group(2)
+                if (not last_name) and first_name:
+                    if " " in first_name:
+                        last_name = first_name.split(" ")[-1]
+                        first_name = " ".join(first_name.split(" ")[:-1])
+                    else:
+                        last_name = first_name
+                        first_name = ""
 
                 matching_authors = set()
                 if self._annuary is not None:
@@ -164,11 +175,14 @@ class PDFLoader(ISCAObject):
                             f"Multiple authors available for ({first_name} {last_name}), do not select any but solves this for later"
                         )
 
-                    cur_author = Person(
-                        None,
-                        first_name,
-                        last_name,
-                    )
+                    try:
+                        cur_author = Person(
+                            None,
+                            first_name,
+                            last_name,
+                        )
+                    except Exception:
+                        raise PDFMetadataException(f'Can\'t parse authors: "{cur_author}"')
 
                 list_authors.append(cur_author)
             else:
