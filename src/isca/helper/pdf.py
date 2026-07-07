@@ -6,7 +6,7 @@ import unicodedata
 from isca.model.core import ISCAObject
 from isca.data.pdf import PDF
 from isca.model.item import Paper
-from .string_helpers import diff_html, norm_abstract
+from .string_helpers import diff_html, has_numbers, norm_abstract
 
 VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(
     r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\].*)$", flags=re.IGNORECASE
@@ -427,6 +427,68 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
     def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True):
         super().__init__(max_nb_pages, nb_non_content_pages, check_font)
 
+    def _validate_authors(self, paper: Paper) -> str | None:
+        report = []
+        for author in paper.authors:
+            lastname = author.lastname
+            firstname = author.firstname
+            slow = lastname.lower()
+
+            if lastname.isupper():
+                report.append(f'The lastname "{lastname}" is in full uppercase')
+            if lastname.islower():
+                report.append(f'The lastname "{lastname}" is in full lowercase')
+            if lastname.isupper():
+                report.append(f'The lastname "{lastname}" is in full uppercase')
+            if lastname.islower():
+                report.append(f'The lastname "{lastname}" is in full lowercase')
+            if "_" in lastname:
+                report.append(f"underscore in lastname {lastname} for")
+            if len(lastname) == 1:
+                report.append(f'length 1 lastname "{lastname}')
+            if lastname in {
+                "1",
+                "(1)",
+                "(2)",
+                "I.",
+                "II",
+                "IV",
+                "El",
+                "Jr",
+                "[NO",
+                "Jr.",
+                "III",
+            }:
+                report.append(f"Undefined error in {lastname}")
+            if has_numbers(lastname):
+                report.append(f"lastname may contain numbers {n1} {n2}")
+            if "." in lastname:
+                if len(slow.split()) > 1 and lastname.split()[-1] == "Jr.":
+                    pass
+                else:
+                    report.append(f"period in lastname {lastname}")
+            if lastname[0] == lastname[0].lower():
+                if slow.startswith("d'"):
+                    pass
+                elif len(slow.split()) > 1 and slow.split()[0] in {"de", "van", "ten"}:
+                    pass
+                else:
+                    report.append(f"lastname case? {lastname}")
+
+            if lastname in {"d'Alessandro", "Matsu'ura", "N'Guyen"}:
+                pass
+            elif "'" in lastname:
+                if not slow.startswith("o'") and not slow.startswith("d'") and not slow.startswith("prud'"):
+                    report.append(f"quote in lastname? {lastname}")
+
+            if "}" in lastname:
+                report.append(f"brace in lastname? {lastname}")
+
+        if not report:
+            return None
+        else:
+            return "\n".join(report)
+
     def _validate_abstract(self, first_page: pymupdf.Page, abstract: str) -> str | None:
         first_page_content = str(first_page.get_text())
         report = None
@@ -462,6 +524,13 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
         assert paper is not None, f"[pid={pid}] For anonymous submission, the paper metadata (not the PDF metdata) is required"
         _, summary, report = super().validates(pid, pdf, paper)
 
+        # Check authors
+        authors_report = self._validate_authors(paper)
+        if authors_report is not None:
+            summary["authors"] = True
+            report["authors"] = authors_report
+
+        # Check abstract
         first_page = pdf.content.load_page(0)
         abstract_report = self._validate_abstract(first_page, paper.abstract if paper.abstract is not None else "")
         if abstract_report is not None:
