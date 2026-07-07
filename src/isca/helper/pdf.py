@@ -6,8 +6,7 @@ import unicodedata
 from isca.model.core import ISCAObject
 from isca.data.pdf import PDF
 from isca.model.item import Paper
-from .string_helpers import diff_html
-
+from .string_helpers import diff_html, norm_abstract
 
 VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(
     r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\].*)$", flags=re.IGNORECASE
@@ -52,7 +51,17 @@ ACCEPTED_FONT_SIZE = 9
 ACCEPTED_PAGE_SIZE = (595, 841)
 
 
-class MinimalPDFChecker(ISCAObject):
+class BaseChecker(ISCAObject):
+    def __init__(self):
+        super().__init__()
+
+    def validates(
+        self, pid: str, pdf: PDF, paper: Paper | None = None
+    ) -> tuple[bool, dict[str, bool], dict[str, str]]:  # pyright: ignore[reportUndefinedVariable]
+        raise NotImplementedError("This is an abstract class, this method can't be called directly")
+
+
+class MinimalPDFChecker(BaseChecker):
     """Minimal PDF Checker which assumes that the PDF is compiled using the ISCA template"""
 
     def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True):
@@ -435,6 +444,7 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
             # found abstract so generate diff
             if ab_st > -1 and ab_fin > -1:
                 abstract_cand = first_page_content[ab_st + 8 : ab_fin].strip()
+                abstract_cand = norm_abstract(abstract_cand)
                 # dlist = find_diffs(abstract, abstract_cand, METADATA_DIFF_HEADER, PDF_DIFF_HEADER)
                 diff_latex = diff_html(abstract, abstract_cand)
                 if diff_latex != "":
@@ -457,5 +467,24 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
         if abstract_report is not None:
             summary["abstract"] = True
             report["abstract"] = abstract_report
+
+        return (len(summary.keys()) > 0, summary, report)
+
+
+class ValidateAuthors(BaseChecker):
+    def __init__(self):
+        super().__init__()
+
+    def validates(
+        self, pid: str, pdf: PDF, paper: Paper | None = None
+    ) -> tuple[bool, dict[str, bool], dict[str, str]]:  # pyright: ignore[reportUndefinedVariable]
+        summary = {}
+        report = {}
+
+        if len(paper.authors) != len(pdf.authors):
+            summary["diff_nb_authors"] = True
+            summary[
+                "diff_nb_authors"
+            ] = f"The PDF file has {len(pdf.authors)} while the metadata has {len(paper.authors)} authors"
 
         return (len(summary.keys()) > 0, summary, report)
