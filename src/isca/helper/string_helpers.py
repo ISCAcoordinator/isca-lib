@@ -602,12 +602,12 @@ def diff_html(s1: str, s2: str, deletion_color: str = "#ffdddd", insertion_color
         if tag == "equal":
             result.append(html.escape(s1[i1:i2]))
         elif tag == "delete":
-            result.append(f'<span style="background-color:{deletion_color};">{html.escape(s1[i1:i2])}</span>')
+            result.append(f'<span class="delete" style="background-color:{deletion_color};">{html.escape(s1[i1:i2])}</span>')
         elif tag == "insert":
-            result.append(f'<span style="background-color:{insertion_color};">{html.escape(s2[j1:j2])}</span>')
+            result.append(f'<span class="insert" style="background-color:{insertion_color};">{html.escape(s2[j1:j2])}</span>')
         elif tag == "replace":
-            result.append(f'<span style="background-color:{deletion_color};">{html.escape(s1[i1:i2])}</span>')
-            result.append(f'<span style="background-color:{insertion_color};">{html.escape(s2[j1:j2])}</span>')
+            result.append(f'<span class="delete" style="background-color:{deletion_color};">{html.escape(s1[i1:i2])}</span>')
+            result.append(f'<span class="insert" style="background-color:{insertion_color};">{html.escape(s2[j1:j2])}</span>')
 
     return "".join(result)
 

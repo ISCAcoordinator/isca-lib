@@ -6,7 +6,7 @@ import unicodedata
 from isca.model.core import ISCAObject
 from isca.data.pdf import PDF
 from isca.model.item import Paper
-from .string_helpers import diff_html, has_numbers, norm_abstract
+from .string_helpers import diff_html, diff_latex, has_numbers, norm_abstract
 
 VALID_REFERENCE_PAGE_CONTENT_REGEXP = re.compile(
     r"^([0-9]+[.][ \t]*(reference|acknowledg[e]?ment|generative ai use disclosure)s?[ \t]*|\[[0-9]+\].*)$", flags=re.IGNORECASE
@@ -424,8 +424,9 @@ class AnonymousPDFChecker(MinimalPDFChecker):
 
 
 class CameraReadyPDFChecker(MinimalPDFChecker):
-    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True):
+    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True, export_latex: bool = True):
         super().__init__(max_nb_pages, nb_non_content_pages, check_font)
+        self._export_latex = export_latex
 
     def _validate_authors(self, paper: Paper) -> str | None:
         report = []
@@ -506,9 +507,12 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
                 abstract_cand = first_page_content[ab_st + 8 : ab_fin].strip()
                 abstract_cand = norm_abstract(abstract_cand)
                 # dlist = find_diffs(abstract, abstract_cand, METADATA_DIFF_HEADER, PDF_DIFF_HEADER)
-                diff_latex = diff_html(abstract, abstract_cand)
-                if diff_latex != "":
-                    report = diff_latex
+                if self._export_latex:
+                    diff = diff_latex(abstract, abstract_cand)
+                else:
+                    diff = diff_html(abstract, abstract_cand)
+                if diff != "":
+                    report = diff
             else:
                 report = "manual check required"
         else:
