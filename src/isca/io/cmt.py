@@ -58,7 +58,7 @@ class CMTSerialiser(Serialiser):
 
             # Else go through not
             for _, paper_info in df.iterrows():
-                paper_id = paper_info["Paper ID"]
+                paper_id = str(paper_info["Paper ID"])
 
                 # Ignore withdrawn papers
                 withdrawn = paper_info.get("Withdrawn", False)
@@ -91,7 +91,20 @@ class CMTSerialiser(Serialiser):
                         if (pdf_path is not None) and pdf_path.exists():
                             pdf = self._pdf_loader.load_pdf(pdf_path, True)
                             cur_paper.title = pdf.title
-                            # cur_paper.replace_authors(pdf.authors)  # TODO: for now it is not linked to any email
+
+                            if (pdf.authors is not None) and (len(pdf.authors) > 0):
+                                if len(pdf.authors) != len(cur_paper.authors):
+                                    self.logger.error(
+                                        f"[{paper_id}] The number of authors in the metadata and in the PDF are different (pdf={len(pdf.authors)}, metadata={len(cur_paper.authors)})",
+                                        extra={"paper_id": paper_id},
+                                    )
+                                else:
+                                    for i_author in range(len(pdf.authors)):
+                                        aff = cur_paper.authors[i_author].get_first_affiliation(paper_id)
+                                        if aff is not None:
+                                            pdf.authors[i_author].add_paper_affiliation(paper_id, aff)
+
+                                    cur_paper.authors = pdf.authors
 
                             self.logger.debug(
                                 f"[{paper_id}] Metadata extracted from the PDF {pdf_path}",

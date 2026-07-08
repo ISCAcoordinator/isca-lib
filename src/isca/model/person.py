@@ -230,6 +230,18 @@ class Person(ISCAItem):
         """
         return self._roles.intersection(roles)
 
+    def get_first_affiliation(self, paper_id: str | None = None) -> Affiliation | None:
+        if paper_id is None:
+            return self.default_affiliation
+        if paper_id in self.paper_affiliations:
+            aff = self.paper_affiliations[paper_id]
+            if len(aff) > 0:
+                return aff[0]
+            else:
+                return 0
+
+        return self.default_affiliation
+
     def add_paper_affiliation(self, paper_id: str, affiliation: Affiliation):
         """Add an affiliation for a given paper
 
@@ -244,6 +256,8 @@ class Person(ISCAItem):
         if paper_id not in self.paper_affiliations:
             self.paper_affiliations[paper_id] = list()
         self.paper_affiliations[paper_id].append(affiliation)
+        if self.default_affiliation is None:
+            self.default_affiliation = affiliation
 
     def str_last_name(self) -> str:
         """Generate a string version of the User's name formatted as "<Last Name>, <First Name>"

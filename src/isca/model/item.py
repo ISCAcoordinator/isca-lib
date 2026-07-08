@@ -82,6 +82,17 @@ class Paper(ISCAItem):
 
         return self._authors
 
+    @authors.setter
+    def authors(self, authors: list[Person]):
+        """Set the list of authors of the paper
+
+        Parameters
+        ----------
+        authors : list[Person]
+            The list of authors of the paper
+        """
+        self._authors = authors
+
     @property
     def pdf_file(self) -> pathlib.Path | None:
         """Get the path to the PDF file of the paper
@@ -113,17 +124,6 @@ class Paper(ISCAItem):
             raise FileNotFoundError(f"[{self.id}] The given PDF file doesn't exist: {pdf_file}")
 
         self._pdf_file = pdf_file
-
-    @authors.setter
-    def set_authors(self, authors: list[Person]):
-        """Set the list of authors of the paper
-
-        Parameters
-        ----------
-        authors : list[Person]
-            The list of authors of the paper
-        """
-        self._authors = authors
 
     def replace_author(self, current_author: Person | int, new_author: Person) -> Person:
         """Replace one author of the paper by a new one

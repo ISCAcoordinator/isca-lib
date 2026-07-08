@@ -29,10 +29,7 @@ LATEX_FONTS = set(
 PDF_WORD_KEYWORD_SUFFIX = "_WORD_TEMPLATE"
 PDF_AUTHOR_KEY = "author"
 PDF_TITLE_KEY = "title"
-PDF_AUTHOR_RE = r"(?:[^{]*) \{([^}]*)\}(?: \{([0-9, ]+)\})?"
-
-METADATA_DIFF_HEADER = "[metadata]"
-PDF_DIFF_HEADER = "[pdf]     "
+PDF_AUTHOR_RE = r"([^{]+) \{([^}]+)\}(?: \{([0-9, ]+)\})?"
 
 
 class PDFMetadataException(Exception):
