@@ -434,14 +434,12 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
             firstname = author.firstname
             slow = lastname.lower()
 
+            if firstname.isupper():
+                report.append(f'The firstname "{firstname}" is in full uppercase')
+            if firstname.islower():
+                report.append(f'The firstname "{firstname}" is in full lowercase')
             if lastname.isupper():
                 report.append(f'The lastname "{lastname}" is in full uppercase')
-            if lastname.islower():
-                report.append(f'The lastname "{lastname}" is in full lowercase')
-            if lastname.isupper():
-                report.append(f'The lastname "{lastname}" is in full uppercase')
-            if lastname.islower():
-                report.append(f'The lastname "{lastname}" is in full lowercase')
             if "_" in lastname:
                 report.append(f"underscore in lastname {lastname} for")
             if len(lastname) == 1:
@@ -473,7 +471,7 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
                 elif len(slow.split()) > 1 and slow.split()[0] in {"de", "van", "ten"}:
                     pass
                 else:
-                    report.append(f"lastname case? {lastname}")
+                    report.append(f'The lastname "{lastname}" is in full lowercase')
 
             if lastname in {"d'Alessandro", "Matsu'ura", "N'Guyen"}:
                 pass
