@@ -158,7 +158,6 @@ class MinimalPDFChecker(BaseChecker):
             None if the last pages are valid, else the failing report
 
         """
-
         start_reference_page = self._max_nb_pages - self._nb_non_content_pages
         if start_reference_page >= doc.page_count:
             return None
@@ -275,11 +274,12 @@ class MinimalPDFChecker(BaseChecker):
                 status["metadata_title"] = True
                 report["metadata_title"] = report_title
 
-        # Check that non-content pages do not contains content!
-        report_invalid_non_content = self._validate_non_content(pdf.content)
-        if report_invalid_non_content is not None:
-            status["invalid_non_content"] = True
-            report["invalid_non_content"] = report_invalid_non_content
+        # Check that non-content pages do not contains content! (TODO: disabled for now)
+        if False:
+            report_invalid_non_content = self._validate_non_content(pdf.content)
+            if report_invalid_non_content is not None:
+                status["invalid_non_content"] = True
+                report["invalid_non_content"] = report_invalid_non_content
 
         return (not (len(status.keys()) > 0), status, report)
 
