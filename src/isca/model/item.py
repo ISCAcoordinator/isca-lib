@@ -361,3 +361,25 @@ class ScientificSession(Session):
             The reference to the list of the papers of the session
         """
         return self._papers
+
+    def __repr__(self) -> str:
+        """Get a string representation of a session
+
+        Returns
+        -------
+        str
+            The string representation of the session
+        """
+        paper_ids = [paper.id for paper in self.papers]
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, papers={paper_ids})"
+
+    def __str__(self) -> str:
+        """Get a string representation of a session
+
+        Returns
+        -------
+        str
+            The string representation of the session
+        """
+        paper_ids = [paper.id for paper in self.papers]
+        return f"{self.__class__.__name__}(id={self.id}, name={self.name}, papers={paper_ids})"
