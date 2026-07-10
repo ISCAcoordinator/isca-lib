@@ -335,7 +335,7 @@ class ScientificSession(Session):
         The list of the papers of the session
     """
 
-    def __init__(self, id: str, name: str, papers: list[Paper] | None = []):
+    def __init__(self, id: str, name: str, papers: list[Paper] | None = None):
         """Initialisation method
 
         Parameters

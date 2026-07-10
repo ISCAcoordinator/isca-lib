@@ -160,16 +160,20 @@ class CMTSerialiser(Serialiser):
 
         return dict_papers, self._annuary
 
-    def _generate_id(self, last_name: str) -> str:
-
+    def _generate_id(self, first_name: str | None, last_name: str) -> str:
         id = last_name.strip().lower().replace(" ", "")[: CMTSerialiser.MAX_ID_NAME_LENGTH]
         id = "".join(char for char in id if char.isalpha())
+        if not id:
+            id = first_name.strip().lower().replace(" ", "")[: CMTSerialiser.MAX_ID_NAME_LENGTH]
+            id = "".join(char for char in id if char.isalpha())
+
         if id in self._id_generator:
             self._id_generator[id] += 1
             id = id + str(self._id_generator[id])
         else:
             self._id_generator[id] = 0
 
+        assert id, "The id is empty, meaning something is wrong with this authors"
         return id
 
     def _extract_df_information(self, paper_info: pd.Series) -> Paper:
@@ -244,7 +248,7 @@ class CMTSerialiser(Serialiser):
 
             cur_person = self._annuary.find_person_by_email(email)
             if cur_person is None:
-                id = self._generate_id(last_name)
+                id = self._generate_id(first_name, last_name)
                 cur_person = Person(
                     id,
                     first_name,

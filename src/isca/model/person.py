@@ -196,7 +196,8 @@ class Person(ISCAItem):
         middle_initial: str, optional
             The middle initial of the name of the Person
         """
-        super().__init__(id)
+        assert id.strip(), "The provided ID should not be empty! "
+        super().__init__(id.strip())
         self.firstname: str | None = firstname.strip() if firstname is not None else None
         self.lastname: str = lastname.strip()
         self.default_affiliation: Affiliation | None = default_affiliation
