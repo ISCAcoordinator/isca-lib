@@ -424,7 +424,7 @@ class AnonymousPDFChecker(MinimalPDFChecker):
 
 
 class CameraReadyPDFChecker(MinimalPDFChecker):
-    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True, export_latex: bool = True):
+    def __init__(self, max_nb_pages: int = 6, nb_non_content_pages: int = 2, check_font: bool = True, export_latex: bool = False):
         super().__init__(max_nb_pages, nb_non_content_pages, check_font)
         self._export_latex = export_latex
 
@@ -460,7 +460,7 @@ class CameraReadyPDFChecker(MinimalPDFChecker):
             }:
                 report.append(f"Undefined error in {lastname}")
             if has_numbers(lastname):
-                report.append(f"lastname may contain numbers {n1} {n2}")
+                report.append(f"lastname may contain numbers: {lastname}")
             if "." in lastname:
                 if len(slow.split()) > 1 and lastname.split()[-1] == "Jr.":
                     pass
