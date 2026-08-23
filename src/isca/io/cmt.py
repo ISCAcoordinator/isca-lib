@@ -31,12 +31,14 @@ class CMTSerialiser(Serialiser):
     AFFILIATION_REGEXP = re.compile("^\\s*(?:\\{([^}]+)\\},\\s*)?([^{]+)\\s*(?:,\\s*\\{([^}]+)\\})?\\s*$")
     MAX_ID_NAME_LENGTH = 8
 
-    def __init__(self, metadata_from_pdf: bool = True):
+    def __init__(self, metadata_from_pdf: bool = True, debug: bool = False):
         super().__init__()
+        self.debug = debug
         self._annuary = Annuary()
         self._pdf_loader = PDFLoader(self._annuary)
         self._id_generator: dict[str, int] = dict()
         self._metadata_from_pdf: bool = metadata_from_pdf
+        self._ignored_spreadsheet: set[str] = set(["Changes log"])  # TODO: hardcoded for now
 
     def load_papers(
         self,
@@ -50,6 +52,10 @@ class CMTSerialiser(Serialiser):
 
         wb = load_workbook(filename=submission_summary_file)
         for worksheet in wb.sheetnames:
+            if worksheet in self._ignored_spreadsheet:
+                self.logger.info(f'Ignoring spreadsheet "{worksheet}"')
+                continue
+
             df = load_excel(submission_summary_file, sheet_name=worksheet)
             total_papers = df.shape[0]
             failed_papers = 0
@@ -130,15 +136,18 @@ class CMTSerialiser(Serialiser):
                         )
                         word_papers += 1
                     except (PDFMetadataException, KeyError, IndexError) as ex:  # pyright: ignore[reportUndefinedVariable]
-                        self.logger.error(
-                            f"[{paper_id}] Extraction of the metadata from the PDF failed, falling back on the excel spreadsheet",
-                            extra={
-                                "paper_id": paper_id,
-                                "exception": ex,
-                                "traceback": traceback.format_exc(),
-                            },
-                        )
-                        failed_papers += 1
+                        if self.debug:
+                            raise ex
+                        else:
+                            self.logger.error(
+                                f"[{paper_id}] Extraction of the metadata from the PDF failed, falling back on the excel spreadsheet",
+                                extra={
+                                    "paper_id": paper_id,
+                                    "exception": ex,
+                                    "traceback": traceback.format_exc(),
+                                },
+                            )
+                            failed_papers += 1
 
                 # Link PDF
                 if (pdf_path is not None) and pdf_path.exists():
