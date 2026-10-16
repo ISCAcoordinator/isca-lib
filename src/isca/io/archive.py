@@ -171,7 +171,7 @@ class PublishedArchiveSerialiser(ISCAObject):
             f_out.write(json.dumps(dict_out, indent=2))
 
 
-class ArchiveInputSerialiser(ISCAObject):
+class ArchiveSerialiser(ISCAObject):
     def load(self, metadata_conf_file: pathlib.Path) -> Conference:
         # Load papers
         papers_metadata = pd.read_csv(metadata_conf_file.parent / "papers.txt", sep=ARCHIVE_INPUT_DATA_SEP)
@@ -262,17 +262,18 @@ class ArchiveInputSerialiser(ISCAObject):
         seen_papers = []
         keynotes = []
         with open(output_dir / "sessions.txt", "w") as f_sessions:
-            f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers"]))
+            f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join(["title", "papers", "type"]))
             f_sessions.write("\n")
 
             for session in conf.sessions:
                 if isinstance(session, ScientificSession) and session.papers:
+                    session_type = type(session).__name__.lower().replace("session", "")
                     session_papers = []
                     for paper in session.papers:
                         session_papers.append(str(paper.id))
                     seen_papers += session_papers
                     papers = ARCHIVE_INPUT_DATA_PAPER_SEP.join(session_papers)
-                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers]))
+                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([session.name, papers, session_type]))
                     f_sessions.write("\n")
                 elif isinstance(session, KeynoteSession):
                     presentations = []
@@ -280,20 +281,24 @@ class ArchiveInputSerialiser(ISCAObject):
                         presentations.append(str(keynote_presentation.id))
                         keynotes.append(keynote_presentation)
                     presentations = ARCHIVE_INPUT_DATA_PAPER_SEP.join(presentations)
-                    f_sessions.write(ARCHIVE_INPUT_DATA_SEP.join([str(session.id) + " - " + session.name, presentations]))
+                    f_sessions.write(
+                        ARCHIVE_INPUT_DATA_SEP.join([str(session.id) + " - " + session.name, presentations, "keynote"])
+                    )
                     f_sessions.write("\n")
 
         # Create paper file
         with open(output_dir / "papers.txt", "w") as f_papers:
-            f_papers.write(ARCHIVE_INPUT_DATA_SEP.join(["id", "title", "authors"]))
+            f_papers.write(ARCHIVE_INPUT_DATA_SEP.join(["id", "title", "authors", "type"]))
             f_papers.write("\n")
 
             for paper_id, paper in conf.papers.items():
-
                 if str(paper_id) not in seen_papers:
                     self.logger.warning(f'The paper "{paper_id}" is not part of any sessions, check if it has been withdrawn')
                     continue
 
+                type_paper = type(paper).__name__.lower().replace("paper", "")
+                if not type_paper:
+                    type_paper = "regular"
                 list_authors = []
                 for author in paper.authors:
 
@@ -308,7 +313,7 @@ class ArchiveInputSerialiser(ISCAObject):
                     list_authors.append(cur_author)
 
                 authors = ARCHIVE_INPUT_DATA_AUTHOR_SEP.join(list_authors)
-                f_papers.write(ARCHIVE_INPUT_DATA_SEP.join([str(paper_id), paper.title, authors]))
+                f_papers.write(ARCHIVE_INPUT_DATA_SEP.join([str(paper_id), paper.title, authors, type_paper]))
                 f_papers.write("\n")
 
                 # Save abstract
