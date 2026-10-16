@@ -524,7 +524,7 @@ class Speaker(Person):
         id: str,
         firstname: str | None,
         lastname: str,
-        default_affiliation: Affiliation,
+        default_affiliation: Affiliation | None,
         email: str | None = None,
         roles: set[Role] = set([Role.DEFAULT]),
         paper_affiliations: dict[str, list[Affiliation]] | None = None,
