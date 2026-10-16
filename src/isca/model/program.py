@@ -26,6 +26,19 @@ from .person import Person
 #########################################################################################################
 ### Timeslot classes
 #########################################################################################################
+class FreeSlot:
+    def __init__(self, duration: int):
+        self._duration = duration
+
+    @property
+    def duration(self) -> int:
+        return self._duration
+
+    def __str__(self) -> str:
+        return f"FreeSlot(dur={self.duration})"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class TimeslotType(Enum):
@@ -481,7 +494,7 @@ class PresentationSession(ScientificSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        presentations: list[Presentation] | None = None,
+        presentations: list[Presentation | FreeSlot] | None = None,
         chairs: list[Person] | None = None,
     ):
         """Initialisation method
@@ -503,7 +516,7 @@ class PresentationSession(ScientificSession):
             the initial list of chairs of the session
         """
         super().__init__(id, name)
-        self._presentations: list[Presentation] = presentations if presentations is not None else []
+        self._presentations: list[Presentation | FreeSlot] = presentations if presentations is not None else []
         self.chairs: list[Person] = chairs if chairs is not None else []
 
         # For now, start/end can't be modified to avoid side effects!
@@ -528,7 +541,7 @@ class PresentationSession(ScientificSession):
             A copy of the list of presentations
         """
 
-        return self._presentations.copy()
+        return [pres for pres in self._presentations if not isinstance(pres, FreeSlot)]
 
     @property
     def papers(self) -> list[Paper]:
@@ -542,6 +555,9 @@ class PresentationSession(ScientificSession):
 
         papers = []
         for p in self._presentations:
+            if isinstance(p, FreeSlot):
+                continue
+
             if p.presented_paper is not None:
                 papers.append(p.presented_paper)
         return papers
@@ -671,7 +687,7 @@ class OralSession(PresentationSession):
         name: str,
         start: datetime.datetime,
         end: datetime.datetime,
-        presentations: list[Presentation] | None = None,
+        presentations: list[Presentation | FreeSlot] | None = None,
         chairs: list[Person] | None = None,
         default_presentation_duration: int = 20,
     ):
@@ -703,6 +719,21 @@ class OralSession(PresentationSession):
                 self.add_presentation(p)
 
         self._default_presentation_duration: int = default_presentation_duration
+
+    def add_free_slot(self, slot: FreeSlot):
+        total_duration = (self.end - self.start).seconds / 60
+        expected_duration = 0
+        for cur_presentation in self.presentations:
+            expected_duration += cur_presentation.duration
+        expected_duration += slot.duration
+
+        expected_duration = self._default_presentation_duration * (len(self.presentations) + 1)
+
+        if expected_duration > total_duration:
+            raise Exception(
+                f'[{self.id}] When adding the presentation to session "{self.id}", the total duration would become {expected_duration} minutes but the assigned duration is {total_duration} minutes.'
+            )
+        self._presentations.append(slot)  # FIXME: dirty for now
 
     def add_presentation(self, presentation: Presentation):
         """Add an oral presentation to the session
@@ -760,15 +791,21 @@ class OralSession(PresentationSession):
                 self.presentations
             ), f"[{self.id}] There are not enough presentation in the session ({len(self.presentations)} < {presentation})"
 
-            for pres_idx, cur_presentation in enumerate(self.presentations):
+            pres_idx = 0
+            for cur_presentation in self._presentations:
+                if isinstance(cur_presentation, FreeSlot):
+                    start += datetime.timedelta(minutes=cur_presentation.duration)
+                    continue
+
                 if pres_idx >= presentation:
                     break
 
                 assert cur_presentation.duration is not None
                 start += datetime.timedelta(minutes=cur_presentation.duration)
+                pres_idx += 1
         else:
             found = False
-            for cur_presentation in self.presentations:
+            for cur_presentation in self._presentations:
                 if presentation == cur_presentation:
                     found = True
                     break
@@ -800,9 +837,17 @@ class OralSession(PresentationSession):
         """
 
         if isinstance(presentation, int):
-            presentation = self.presentations[presentation]
+            pres_idx = 0
+            for cur_presentation in self._presentations:
+                if isinstance(cur_presentation, FreeSlot):
+                    continue
 
-        assert presentation.duration is not None
+                if pres_idx >= presentation:
+                    presentation = cur_presentation
+                    break
+
+                pres_idx += 1
+
         return self.start_presentation(presentation) + datetime.timedelta(minutes=presentation.duration)
 
     def timeslot_presentation(self, presentation: Presentation | int) -> AnonymousTimeslot:
