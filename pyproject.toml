@@ -32,6 +32,10 @@ dev = [
   "pytest",
   "debugpy"
 ]
+publish = [
+  "build",
+  "twine"
+]
 [project.urls]
 Homepage = "https://github.com/ISCACoordinator/isca"
 Issues = "https://github.com/ISCACoordinator/isca/issues"
